@@ -258,7 +258,7 @@ export default function Home() {
       <section className="testimonial-section">
         <p className="eyebrow" data-reveal>Manifesto</p>
         <blockquote data-reveal>Não é sobre se tornar outra pessoa.<br /><em>É sobre revelar a sua melhor versão.</em></blockquote>
-        <div className="testimonial-author" data-reveal><span>SA</span><p><strong>Sávia Araújo</strong><small>Beauty with intention</small></p></div>
+        <div className="testimonial-author" data-reveal><img src="/media/savia-manifesto.jpg" alt="Sávia Araújo" /><p><strong>Sávia Araújo</strong><small>Beauty with intention</small></p></div>
       </section>
 
       <section className="closing-cta">

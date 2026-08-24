@@ -89,6 +89,10 @@ export default function AdminDashboard({ initialBookings, username, signOutPath 
             <button key={id} className={view === id ? 'active' : ''} onClick={() => setView(id)}><Icon size={15} /> {label}</button>
           ))}
         </nav>
+        <div className="admin-owner-card">
+          <img src="/media/savia-admin.jpg" alt="Retrato de Sávia Araújo" />
+          <div><strong>Sávia Araújo</strong><small>Makeup Artist</small></div>
+        </div>
         <div className="admin-user"><strong>{username}</strong><small>Administradora</small><a href={signOutPath}>Sair do painel</a></div>
       </aside>
 
