@@ -392,7 +392,11 @@ footer > small { justify-self: end; color: rgba(243,237,226,.34); font-size: 8px
   .admin-sidebar .brand { margin-bottom: 18px; }
   .admin-nav { display: flex; overflow-x: auto; }
   .admin-nav button { width: auto; flex: 0 0 auto; white-space: nowrap; }
-  .admin-owner-card { display: none; }
+  .admin-owner-card { min-height: 68px; margin: 16px 0 0; }
+  .admin-owner-card::after { inset: 0; background: linear-gradient(90deg, transparent 15%, rgba(10,8,6,.94) 62%); }
+  .admin-owner-card img { height: 68px; object-position: 50% 22%; }
+  .admin-owner-card div { bottom: 13px; left: 44%; }
+  .admin-owner-card strong { font-size: 16px; }
   .admin-user { display: none; }
   .admin-main { padding: 26px 15px 55px; }
   .admin-date { display: none; }
