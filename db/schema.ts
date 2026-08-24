@@ -1,0 +1,24 @@
+export type Booking = {
+  id: string;
+  createdAt: number;
+  clientName: string;
+  whatsapp: string;
+  email: string | null;
+  service: string;
+  serviceLabel: string;
+  appointmentDate: string;
+  appointmentTime: string;
+  priceCents: number;
+  depositCents: number;
+  balanceCents: number;
+  status: string;
+  paymentStatus: string;
+  paymentProvider: string | null;
+  paymentPreferenceId: string | null;
+  paymentId: string | null;
+  paymentUrl: string | null;
+  paidAt: number | null;
+  notes: string | null;
+  receiptKey: string | null;
+  receiptName: string | null;
+};
