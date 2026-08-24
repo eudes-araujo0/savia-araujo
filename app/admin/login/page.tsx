@@ -16,7 +16,7 @@ export default async function AdminLoginPage() {
   return (
     <main className="admin-login-page">
       <section className="admin-login-visual">
-        <img src="/media/hero-portrait.jpg" alt="" />
+        <img src="/media/savia-admin.jpg" alt="Sávia Araújo" />
         <Link className="brand" href="/">SÁVIA <span>ARAÚJO</span></Link>
         <div><p className="eyebrow">Área reservada</p><h1>Gestão com<br /><em>elegância.</em></h1></div>
       </section>
