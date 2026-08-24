@@ -6,11 +6,11 @@ Projeto completo em Next.js para publicar na Vercel, com banco PostgreSQL da Neo
 
 - site e portfólio responsivos;
 - agendamento com bloqueio de horários já reservados;
-- cálculo automático do sinal de 50%;
+- escolha entre sinal de 50% ou pagamento integral;
 - checkout do Mercado Pago e confirmação por webhook;
 - modo de demonstração sem cobrança real;
 - login administrativo por usuário e senha;
-- agenda, clientes, financeiro e pagamentos no painel;
+- agenda, clientes pagos, clientes pendentes, financeiro e pagamentos no painel;
 - criação automática das tabelas no primeiro acesso ao banco.
 
 ## 1. Preparar o projeto localmente
@@ -90,7 +90,7 @@ https://SEU-DOMINIO/api/mercado-pago/webhook
 4. copie a assinatura secreta do webhook para `MERCADO_PAGO_WEBHOOK_SECRET`;
 5. deixe `PAYMENTS_DEMO_MODE=false` e faça um redeploy.
 
-O agendamento nasce como pendente. Ele só muda para confirmado quando o Mercado Pago informa que o sinal de 50% foi aprovado. O comprovante é o próprio identificador digital da transação mostrado no painel; não há upload manual de arquivos.
+O agendamento nasce como pendente. A cliente escolhe pagar o sinal de 50% ou o valor integral, e a reserva só muda para confirmada quando o Mercado Pago aprova o valor escolhido. Solicitações sem aprovação ficam em **Clientes pendentes**; os indicadores financeiros consideram apenas pagamentos aprovados. O comprovante é o próprio identificador digital da transação mostrado no painel; não há upload manual de arquivos.
 
 ## Acessos
 

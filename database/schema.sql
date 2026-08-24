@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS bookings (
   price_cents INTEGER NOT NULL,
   deposit_cents INTEGER NOT NULL DEFAULT 0,
   balance_cents INTEGER NOT NULL DEFAULT 0,
+  payment_option TEXT NOT NULL DEFAULT 'deposit',
+  payment_amount_cents INTEGER NOT NULL DEFAULT 0,
   status TEXT NOT NULL,
   payment_status TEXT NOT NULL,
   payment_provider TEXT,
@@ -22,6 +24,10 @@ CREATE TABLE IF NOT EXISTS bookings (
   receipt_key TEXT,
   receipt_name TEXT
 );
+
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_option TEXT NOT NULL DEFAULT 'deposit';
+ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_amount_cents INTEGER NOT NULL DEFAULT 0;
+UPDATE bookings SET payment_amount_cents = deposit_cents WHERE payment_amount_cents = 0 AND deposit_cents > 0;
 
 CREATE INDEX IF NOT EXISTS idx_bookings_appointment_date
   ON bookings(appointment_date);

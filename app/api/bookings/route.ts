@@ -31,6 +31,8 @@ export async function POST(request: Request) {
 
     const id = `SAV-${appointmentDate.replaceAll('-', '')}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
     const depositCents = catalogItem.priceCents ? Math.round(catalogItem.priceCents * 0.5) : 0;
+    const paymentOption = text(form, 'paymentOption') === 'full' ? 'full' : 'deposit';
+    const paymentAmountCents = catalogItem.priceCents ? (paymentOption === 'full' ? catalogItem.priceCents : depositCents) : 0;
     const booking: Booking = {
       id,
       createdAt: Date.now(),
@@ -43,7 +45,9 @@ export async function POST(request: Request) {
       appointmentTime,
       priceCents: catalogItem.priceCents,
       depositCents,
-      balanceCents: catalogItem.priceCents - depositCents,
+      balanceCents: catalogItem.priceCents - paymentAmountCents,
+      paymentOption,
+      paymentAmountCents,
       status: 'pendente',
       paymentStatus: depositCents ? 'aguardando' : 'nao_aplicavel',
       paymentProvider: null,
@@ -64,15 +68,15 @@ export async function POST(request: Request) {
       throw databaseError;
     }
 
-    if (!depositCents) return NextResponse.json({ id, depositCents, balanceCents: 0, paymentMode: 'unavailable', paymentUrl: null }, { status: 201 });
+    if (!paymentAmountCents) return NextResponse.json({ id, paymentAmountCents, balanceCents: 0, paymentMode: 'unavailable', paymentUrl: null }, { status: 201 });
 
     try {
       const checkout = await createPaymentCheckout(booking, new URL(request.url).origin);
       await updatePaymentPreference(id, checkout.mode === 'demo' ? 'demo' : 'mercado_pago', checkout.preferenceId, checkout.paymentUrl);
-      return NextResponse.json({ id, depositCents, balanceCents: booking.balanceCents, paymentMode: checkout.mode, paymentUrl: checkout.paymentUrl }, { status: 201 });
+      return NextResponse.json({ id, paymentAmountCents, paymentOption, balanceCents: booking.balanceCents, paymentMode: checkout.mode, paymentUrl: checkout.paymentUrl }, { status: 201 });
     } catch (paymentError) {
       console.error('payment-preference-failed', paymentError);
-      return NextResponse.json({ id, depositCents, balanceCents: booking.balanceCents, paymentMode: 'unavailable', paymentUrl: null, paymentError: 'A reserva foi registrada, mas o pagamento está temporariamente indisponível.' }, { status: 201 });
+      return NextResponse.json({ id, paymentAmountCents, paymentOption, balanceCents: booking.balanceCents, paymentMode: 'unavailable', paymentUrl: null, paymentError: 'A reserva foi registrada, mas o pagamento está temporariamente indisponível.' }, { status: 201 });
     }
   } catch (error) {
     console.error('booking-create-failed', error);

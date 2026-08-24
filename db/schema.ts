@@ -11,6 +11,8 @@ export type Booking = {
   priceCents: number;
   depositCents: number;
   balanceCents: number;
+  paymentOption: 'deposit' | 'full';
+  paymentAmountCents: number;
   status: string;
   paymentStatus: string;
   paymentProvider: string | null;

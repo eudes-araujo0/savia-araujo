@@ -2,10 +2,10 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { CalendarDays, CircleDollarSign, LayoutDashboard, ReceiptText, Search, Sparkles, Users } from 'lucide-react';
+import { CalendarDays, CircleDollarSign, Clock3, LayoutDashboard, ReceiptText, Search, Sparkles, Users } from 'lucide-react';
 import type { Booking } from '../../db/schema';
 
-type View = 'visao-geral' | 'agenda' | 'clientes' | 'financeiro' | 'comprovantes';
+type View = 'visao-geral' | 'agenda' | 'clientes' | 'clientes-pendentes' | 'financeiro' | 'comprovantes';
 
 type Props = {
   initialBookings: Booking[];
@@ -17,6 +17,7 @@ const navigation: { id: View; label: string; icon: typeof LayoutDashboard }[] = 
   { id: 'visao-geral', label: 'Visão geral', icon: LayoutDashboard },
   { id: 'agenda', label: 'Agenda', icon: CalendarDays },
   { id: 'clientes', label: 'Clientes', icon: Users },
+  { id: 'clientes-pendentes', label: 'Clientes pendentes', icon: Clock3 },
   { id: 'financeiro', label: 'Financeiro', icon: CircleDollarSign },
   { id: 'comprovantes', label: 'Comprovantes', icon: ReceiptText },
 ];
@@ -29,6 +30,8 @@ export default function AdminDashboard({ initialBookings, username, signOutPath 
   const today = useMemo(() => todayInSaoPaulo(), []);
 
   const activeBookings = useMemo(() => bookings.filter((booking) => booking.status !== 'cancelado'), [bookings]);
+  const paidBookings = useMemo(() => activeBookings.filter((booking) => booking.paymentStatus === 'pago'), [activeBookings]);
+  const pendingBookings = useMemo(() => activeBookings.filter((booking) => booking.paymentStatus !== 'pago'), [activeBookings]);
   const filteredBookings = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase('pt-BR');
     if (!normalized) return bookings;
@@ -46,27 +49,26 @@ export default function AdminDashboard({ initialBookings, username, signOutPath 
       { label: 'No ano', predicate: (booking: Booking) => booking.appointmentDate.startsWith(today.slice(0, 4)), note: 'valor contratado' },
     ];
     return ranges.map((range) => {
-      const period = activeBookings.filter(range.predicate);
-      return { ...range, value: money(sum(period, 'priceCents')), count: period.length };
+      const period = paidBookings.filter(range.predicate);
+      return { ...range, value: money(sum(period, 'paymentAmountCents')), count: period.length };
     });
-  }, [activeBookings, today]);
+  }, [paidBookings, today]);
 
   const financial = useMemo(() => {
-    const paid = activeBookings.filter((booking) => booking.paymentStatus === 'pago');
-    const received = sum(paid, 'depositCents');
-    const contracted = sum(activeBookings, 'priceCents');
-    const outstanding = activeBookings.reduce((total, booking) => total + Math.max(0, booking.priceCents - (booking.paymentStatus === 'pago' ? booking.depositCents : 0)), 0);
-    const pendingDeposits = activeBookings.filter((booking) => !['pago', 'nao_aplicavel'].includes(booking.paymentStatus)).reduce((total, booking) => total + booking.depositCents, 0);
-    return { paid, received, contracted, outstanding, pendingDeposits };
-  }, [activeBookings]);
+    const received = sum(paidBookings, 'paymentAmountCents');
+    const contracted = sum(paidBookings, 'priceCents');
+    const fullReceived = paidBookings.filter((booking) => booking.paymentOption === 'full').reduce((total, booking) => total + booking.paymentAmountCents, 0);
+    const outstanding = paidBookings.reduce((total, booking) => total + Math.max(0, booking.priceCents - booking.paymentAmountCents), 0);
+    return { paid: paidBookings, received, contracted, fullReceived, outstanding };
+  }, [paidBookings]);
 
   const agendaBookings = useMemo(() => activeBookings.filter((booking) => booking.appointmentDate === agendaDate), [activeBookings, agendaDate]);
   const todayBookings = useMemo(() => activeBookings.filter((booking) => booking.appointmentDate === today), [activeBookings, today]);
-  const clients = useMemo(() => groupClients(activeBookings), [activeBookings]);
+  const clients = useMemo(() => groupClients(paidBookings), [paidBookings]);
   const chart = useMemo(() => Array.from({ length: 7 }, (_, index) => {
     const date = addDays(new Date(`${today}T12:00:00Z`), index - 6);
     const dateIso = iso(date);
-    const value = financial.paid.filter((booking) => booking.paidAt && todayFromTimestamp(booking.paidAt) === dateIso).reduce((total, booking) => total + booking.depositCents, 0);
+    const value = financial.paid.filter((booking) => booking.paidAt && todayFromTimestamp(booking.paidAt) === dateIso).reduce((total, booking) => total + booking.paymentAmountCents, 0);
     return { date: dateIso, label: weekday(date), value };
   }), [financial.paid, today]);
   const maxChart = Math.max(...chart.map((item) => item.value), 1);
@@ -134,17 +136,22 @@ export default function AdminDashboard({ initialBookings, username, signOutPath 
             {clients.filter((client) => !query || [client.name, client.whatsapp, client.email].join(' ').toLocaleLowerCase('pt-BR').includes(query.toLocaleLowerCase('pt-BR'))).map((client) => (
               <article className="client-card" key={client.key}><span>{initials(client.name)}</span><div><h2>{client.name}</h2><p>{client.whatsapp}{client.email ? ` · ${client.email}` : ''}</p><small>{client.bookings} {client.bookings === 1 ? 'atendimento' : 'atendimentos'} · {money(client.value)} contratados</small></div></article>
             ))}
-            {!clients.length && <div className="empty-state">Os clientes aparecerão aqui após o primeiro agendamento.</div>}
+            {!clients.length && <div className="empty-state">Os clientes aparecerão aqui após o pagamento ser aprovado.</div>}
           </section>
           {!!filteredBookings.length && <section className="admin-panel admin-full"><div className="panel-head"><h2>Histórico dos clientes</h2><span>{filteredBookings.length} registros</span></div><BookingsTable bookings={filteredBookings} onStatusChange={changeStatus} /></section>}
         </>}
 
+        {view === 'clientes-pendentes' && <section className="admin-panel admin-view-panel">
+          <div className="panel-head"><div><h2>Clientes pendentes</h2><span>Solicitações ainda sem pagamento aprovado</span></div><strong>{pendingBookings.length}</strong></div>
+          <PendingClients bookings={pendingBookings} />
+        </section>}
+
         {view === 'financeiro' && <>
           <div className="finance-summary">
-            <article><small>Contratado</small><strong>{money(financial.contracted)}</strong><span>valor total dos serviços ativos</span></article>
-            <article><small>Sinais recebidos</small><strong>{money(financial.received)}</strong><span>50% confirmados pelo pagamento</span></article>
-            <article><small>Sinais pendentes</small><strong>{money(financial.pendingDeposits)}</strong><span>reservas ainda não confirmadas</span></article>
-            <article><small>Saldo a receber</small><strong>{money(financial.outstanding)}</strong><span>restante após os sinais pagos</span></article>
+            <article><small>Contratado confirmado</small><strong>{money(financial.contracted)}</strong><span>somente reservas pagas</span></article>
+            <article><small>Recebido pelo site</small><strong>{money(financial.received)}</strong><span>sinais e pagamentos integrais aprovados</span></article>
+            <article><small>Integrais recebidos</small><strong>{money(financial.fullReceived)}</strong><span>reservas quitadas pelo site</span></article>
+            <article><small>Saldo a receber</small><strong>{money(financial.outstanding)}</strong><span>restante dos sinais já pagos</span></article>
           </div>
           <section className="admin-panel admin-full">
             <div className="panel-head"><h2>Entradas nos últimos 7 dias</h2><span>sinais aprovados</span></div>
@@ -152,16 +159,16 @@ export default function AdminDashboard({ initialBookings, username, signOutPath 
               {chart.map((item) => <div className="chart-bar" key={item.date}><strong>{item.value ? money(item.value) : ''}</strong><i style={{ height: `${Math.max(5, item.value / maxChart * 100)}%` }} /><span>{item.label}</span></div>)}
             </div>
           </section>
-          <section className="admin-panel admin-full"><div className="panel-head"><h2>Movimentação por reserva</h2><span>{activeBookings.length} reservas ativas</span></div><FinanceTable bookings={activeBookings} /></section>
+          <section className="admin-panel admin-full"><div className="panel-head"><h2>Movimentação por reserva</h2><span>{paidBookings.length} pagamentos aprovados</span></div><FinanceTable bookings={paidBookings} /></section>
         </>}
 
         {view === 'comprovantes' && <section className="admin-panel admin-view-panel">
-          <div className="panel-head"><div><h2>Pagamentos e comprovantes</h2><span>A confirmação ocorre somente após 50% do valor aprovado</span></div></div>
+          <div className="panel-head"><div><h2>Pagamentos e comprovantes</h2><span>Sinal de 50% ou valor integral, conforme a escolha da cliente</span></div></div>
           <div className="payment-list">
             {bookings.map((booking) => (
               <article className="payment-row" key={booking.id}>
                 <div><strong>{booking.clientName}</strong><small>{booking.id} · {booking.serviceLabel}</small></div>
-                <div><small>Sinal</small><strong>{booking.depositCents ? money(booking.depositCents) : 'Sob consulta'}</strong></div>
+                <div><small>{booking.paymentOption === 'full' ? 'Integral' : 'Sinal 50%'}</small><strong>{booking.paymentAmountCents ? money(booking.paymentAmountCents) : 'Sob consulta'}</strong></div>
                 <span className={`payment-pill ${booking.paymentStatus}`}>{paymentLabel(booking.paymentStatus)}</span>
                 <div className="payment-proof">
                   {booking.paymentId && <small>{booking.paymentProvider === 'demo' ? 'Demonstração' : 'Mercado Pago'} · {booking.paymentId}</small>}
@@ -200,9 +207,21 @@ function BookingsTable({ bookings, onStatusChange }: { bookings: Booking[]; onSt
 
 function FinanceTable({ bookings }: { bookings: Booking[] }) {
   if (!bookings.length) return <div className="empty-state">Nenhuma movimentação financeira.</div>;
-  return <div className="bookings-table-wrap"><table className="bookings-table"><thead><tr><th>Cliente</th><th>Serviço</th><th>Total</th><th>Sinal 50%</th><th>Recebido</th><th>Saldo</th></tr></thead><tbody>{bookings.map((booking) => (
-    <tr key={booking.id}><td>{booking.clientName}</td><td>{booking.serviceLabel}</td><td>{money(booking.priceCents)}</td><td>{money(booking.depositCents)}</td><td>{booking.paymentStatus === 'pago' ? money(booking.depositCents) : money(0)}</td><td>{money(Math.max(0, booking.priceCents - (booking.paymentStatus === 'pago' ? booking.depositCents : 0)))}</td></tr>
+  return <div className="bookings-table-wrap"><table className="bookings-table"><thead><tr><th>Cliente</th><th>Serviço</th><th>Total</th><th>Opção</th><th>Recebido</th><th>Saldo</th></tr></thead><tbody>{bookings.map((booking) => (
+    <tr key={booking.id}><td>{booking.clientName}</td><td>{booking.serviceLabel}</td><td>{money(booking.priceCents)}</td><td>{booking.paymentOption === 'full' ? 'Integral' : 'Sinal 50%'}</td><td>{money(booking.paymentAmountCents)}</td><td>{money(Math.max(0, booking.priceCents - booking.paymentAmountCents))}</td></tr>
   ))}</tbody></table></div>;
+}
+
+function PendingClients({ bookings }: { bookings: Booking[] }) {
+  if (!bookings.length) return <div className="empty-state">Nenhuma cliente aguardando pagamento.</div>;
+  return <div className="payment-list">{bookings.map((booking) => (
+    <article className="payment-row" key={booking.id}>
+      <div><strong>{booking.clientName}</strong><small>{booking.whatsapp}{booking.email ? ` · ${booking.email}` : ''}</small></div>
+      <div><strong>{booking.serviceLabel}</strong><small>{formatDate(booking.appointmentDate)} · {booking.appointmentTime}</small></div>
+      <div><strong>{booking.paymentAmountCents ? money(booking.paymentAmountCents) : 'Sob consulta'}</strong><small>{booking.paymentOption === 'full' ? 'Pagamento integral' : 'Sinal de 50%'}</small></div>
+      <span className={`payment-pill ${booking.paymentStatus}`}>{paymentLabel(booking.paymentStatus)}</span>
+    </article>
+  ))}</div>;
 }
 
 function groupClients(bookings: Booking[]) {
@@ -217,7 +236,7 @@ function groupClients(bookings: Booking[]) {
   return [...clients.values()].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 }
 
-function sum(items: Booking[], field: 'priceCents' | 'depositCents') { return items.reduce((total, booking) => total + booking[field], 0); }
+function sum(items: Booking[], field: 'priceCents' | 'depositCents' | 'paymentAmountCents') { return items.reduce((total, booking) => total + booking[field], 0); }
 function money(cents: number) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100); }
 function formatDate(value: string) { const [year, month, day] = value.split('-'); return `${day}/${month}/${year}`; }
 function iso(value: Date) { return value.toISOString().slice(0, 10); }

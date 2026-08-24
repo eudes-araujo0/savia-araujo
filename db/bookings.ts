@@ -29,6 +29,8 @@ export async function ensureBookingsSchema() {
       price_cents INTEGER NOT NULL,
       deposit_cents INTEGER NOT NULL DEFAULT 0,
       balance_cents INTEGER NOT NULL DEFAULT 0,
+      payment_option TEXT NOT NULL DEFAULT 'deposit',
+      payment_amount_cents INTEGER NOT NULL DEFAULT 0,
       status TEXT NOT NULL,
       payment_status TEXT NOT NULL,
       payment_provider TEXT,
@@ -40,6 +42,9 @@ export async function ensureBookingsSchema() {
       receipt_key TEXT,
       receipt_name TEXT
     )`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_option TEXT NOT NULL DEFAULT 'deposit'`;
+    await sql`ALTER TABLE bookings ADD COLUMN IF NOT EXISTS payment_amount_cents INTEGER NOT NULL DEFAULT 0`;
+    await sql`UPDATE bookings SET payment_amount_cents = deposit_cents WHERE payment_amount_cents = 0 AND deposit_cents > 0`;
     await sql`CREATE INDEX IF NOT EXISTS idx_bookings_appointment_date ON bookings(appointment_date)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_bookings_status_date ON bookings(status, appointment_date)`;
     await sql`CREATE INDEX IF NOT EXISTS idx_bookings_payment_status ON bookings(payment_status)`;
@@ -58,13 +63,13 @@ export async function createBooking(booking: Booking) {
   const sql = database();
   await sql`INSERT INTO bookings (
     id, created_at, client_name, whatsapp, email, service, service_label,
-    appointment_date, appointment_time, price_cents, deposit_cents, balance_cents,
+    appointment_date, appointment_time, price_cents, deposit_cents, balance_cents, payment_option, payment_amount_cents,
     status, payment_status, payment_provider, payment_preference_id, payment_id,
     payment_url, paid_at, notes, receipt_key, receipt_name
   ) VALUES (
     ${booking.id}, ${booking.createdAt}, ${booking.clientName}, ${booking.whatsapp}, ${booking.email},
     ${booking.service}, ${booking.serviceLabel}, ${booking.appointmentDate}, ${booking.appointmentTime},
-    ${booking.priceCents}, ${booking.depositCents}, ${booking.balanceCents}, ${booking.status},
+    ${booking.priceCents}, ${booking.depositCents}, ${booking.balanceCents}, ${booking.paymentOption}, ${booking.paymentAmountCents}, ${booking.status},
     ${booking.paymentStatus}, ${booking.paymentProvider}, ${booking.paymentPreferenceId},
     ${booking.paymentId}, ${booking.paymentUrl}, ${booking.paidAt}, ${booking.notes},
     ${booking.receiptKey}, ${booking.receiptName}
@@ -144,6 +149,8 @@ function mapBooking(row: Record<string, unknown>): Booking {
     priceCents: Number(row.price_cents),
     depositCents: Number(row.deposit_cents ?? 0),
     balanceCents: Number(row.balance_cents ?? 0),
+    paymentOption: row.payment_option === 'full' ? 'full' : 'deposit',
+    paymentAmountCents: Number(row.payment_amount_cents ?? row.deposit_cents ?? 0),
     status: String(row.status),
     paymentStatus: String(row.payment_status),
     paymentProvider: row.payment_provider ? String(row.payment_provider) : null,

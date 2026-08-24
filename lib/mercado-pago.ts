@@ -31,11 +31,11 @@ export async function createPaymentCheckout(booking: Booking, origin: string) {
     body: JSON.stringify({
       items: [{
         id: `sinal-${booking.id}`,
-        title: `Sinal de 50% · ${booking.serviceLabel}`,
+        title: `${booking.paymentOption === 'full' ? 'Pagamento integral' : 'Sinal de 50%'} · ${booking.serviceLabel}`,
         description: `Reserva ${booking.appointmentDate} às ${booking.appointmentTime}`,
         quantity: 1,
         currency_id: 'BRL',
-        unit_price: booking.depositCents / 100,
+        unit_price: booking.paymentAmountCents / 100,
       }],
       payer: { name: booking.clientName, email: booking.email || undefined },
       external_reference: booking.id,

@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     const bookingId = payment.external_reference || '';
     const booking = bookingId ? await getBooking(bookingId) : null;
     if (!booking || booking.paymentProvider !== 'mercado_pago') return NextResponse.json({ received: true });
-    if (payment.currency_id !== 'BRL' || Math.round(Number(payment.transaction_amount || 0) * 100) < booking.depositCents) {
+    if (payment.currency_id !== 'BRL' || Math.round(Number(payment.transaction_amount || 0) * 100) < booking.paymentAmountCents) {
       return NextResponse.json({ error: 'Valor de pagamento divergente.' }, { status: 400 });
     }
 
