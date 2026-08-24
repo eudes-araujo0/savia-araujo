@@ -45,3 +45,52 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_payment_id
 CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_active_slot
   ON bookings(appointment_date, appointment_time)
   WHERE status != 'cancelado';
+
+ALTER TABLE bookings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bookings FORCE ROW LEVEL SECURITY;
+REVOKE ALL ON bookings FROM PUBLIC;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = current_schema()
+      AND tablename = 'bookings'
+      AND policyname = 'bookings_backend_only'
+  ) THEN
+    CREATE POLICY bookings_backend_only
+      ON bookings
+      TO CURRENT_USER
+      USING (true)
+      WITH CHECK (true);
+  END IF;
+END
+$$;
+
+CREATE TABLE IF NOT EXISTS login_attempts (
+  key_hash TEXT PRIMARY KEY,
+  attempts INTEGER NOT NULL,
+  window_started BIGINT NOT NULL,
+  blocked_until BIGINT NOT NULL DEFAULT 0
+);
+
+ALTER TABLE login_attempts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE login_attempts FORCE ROW LEVEL SECURITY;
+REVOKE ALL ON login_attempts FROM PUBLIC;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = current_schema()
+      AND tablename = 'login_attempts'
+      AND policyname = 'login_attempts_backend_only'
+  ) THEN
+    CREATE POLICY login_attempts_backend_only
+      ON login_attempts
+      TO CURRENT_USER
+      USING (true)
+      WITH CHECK (true);
+  END IF;
+END
+$$;

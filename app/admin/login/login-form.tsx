@@ -39,8 +39,8 @@ export default function AdminLoginForm() {
       <p className="booking-step-label">Painel administrativo</p>
       <h2>Bem-vinda,<br />Sávia.</h2>
       <p className="admin-login-copy">Entre com seu usuário e senha para acessar agenda, clientes, pagamentos e comprovantes.</p>
-      <div className="form-field"><label htmlFor="admin-user">Usuário</label><input id="admin-user" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} required /></div>
-      <div className="form-field"><label htmlFor="admin-password">Senha</label><input id="admin-password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required /></div>
+      <div className="form-field"><label htmlFor="admin-user">Usuário</label><input id="admin-user" autoComplete="username" maxLength={80} value={username} onChange={(event) => setUsername(event.target.value)} required /></div>
+      <div className="form-field"><label htmlFor="admin-password">Senha</label><input id="admin-password" type="password" autoComplete="current-password" minLength={8} maxLength={256} value={password} onChange={(event) => setPassword(event.target.value)} required /></div>
       {error && <p className="booking-error" role="alert">{error}</p>}
       <button className="button button-dark" type="submit" disabled={submitting}>{submitting ? 'Entrando...' : 'Entrar no painel'} <ArrowRight size={15} /></button>
       <Link className="admin-login-back" href="/">Voltar ao site</Link>

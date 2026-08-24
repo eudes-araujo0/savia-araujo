@@ -1,5 +1,6 @@
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 import type { Booking } from './schema';
+import { decryptSensitive, encryptSensitive } from '../lib/data-crypto';
 
 let client: NeonQueryFunction<false, false> | null = null;
 let initialized: Promise<void> | null = null;
@@ -50,6 +51,28 @@ export async function ensureBookingsSchema() {
     await sql`CREATE INDEX IF NOT EXISTS idx_bookings_payment_status ON bookings(payment_status)`;
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_payment_id ON bookings(payment_id) WHERE payment_id IS NOT NULL`;
     await sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_bookings_active_slot ON bookings(appointment_date, appointment_time) WHERE status != 'cancelado'`;
+    await sql`ALTER TABLE bookings ENABLE ROW LEVEL SECURITY`;
+    await sql`ALTER TABLE bookings FORCE ROW LEVEL SECURITY`;
+    await sql`REVOKE ALL ON bookings FROM PUBLIC`;
+    await sql`DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = current_schema() AND tablename = 'bookings' AND policyname = 'bookings_backend_only') THEN
+          CREATE POLICY bookings_backend_only ON bookings TO CURRENT_USER USING (true) WITH CHECK (true);
+        END IF;
+      END
+    $$`;
+    const legacyRows = await sql`SELECT id, client_name, whatsapp, email, notes FROM bookings
+      WHERE client_name NOT LIKE 'enc:v1:%' OR whatsapp NOT LIKE 'enc:v1:%' OR (email IS NOT NULL AND email NOT LIKE 'enc:v1:%') OR (notes IS NOT NULL AND notes NOT LIKE 'enc:v1:%')
+      LIMIT 1000`;
+    for (const row of legacyRows) {
+      const [clientName, whatsapp, email, notes] = await Promise.all([
+        encryptSensitive(String(row.client_name)),
+        encryptSensitive(String(row.whatsapp)),
+        encryptSensitive(row.email ? String(row.email) : null),
+        encryptSensitive(row.notes ? String(row.notes) : null),
+      ]);
+      await sql`UPDATE bookings SET client_name = ${clientName}, whatsapp = ${whatsapp}, email = ${email}, notes = ${notes} WHERE id = ${String(row.id)}`;
+    }
   })().catch((error) => {
     initialized = null;
     throw error;
@@ -61,17 +84,23 @@ export async function ensureBookingsSchema() {
 export async function createBooking(booking: Booking) {
   await ensureBookingsSchema();
   const sql = database();
+  const [clientName, whatsapp, email, notes] = await Promise.all([
+    encryptSensitive(booking.clientName),
+    encryptSensitive(booking.whatsapp),
+    encryptSensitive(booking.email),
+    encryptSensitive(booking.notes),
+  ]);
   await sql`INSERT INTO bookings (
     id, created_at, client_name, whatsapp, email, service, service_label,
     appointment_date, appointment_time, price_cents, deposit_cents, balance_cents, payment_option, payment_amount_cents,
     status, payment_status, payment_provider, payment_preference_id, payment_id,
     payment_url, paid_at, notes, receipt_key, receipt_name
   ) VALUES (
-    ${booking.id}, ${booking.createdAt}, ${booking.clientName}, ${booking.whatsapp}, ${booking.email},
+    ${booking.id}, ${booking.createdAt}, ${clientName}, ${whatsapp}, ${email},
     ${booking.service}, ${booking.serviceLabel}, ${booking.appointmentDate}, ${booking.appointmentTime},
     ${booking.priceCents}, ${booking.depositCents}, ${booking.balanceCents}, ${booking.paymentOption}, ${booking.paymentAmountCents}, ${booking.status},
     ${booking.paymentStatus}, ${booking.paymentProvider}, ${booking.paymentPreferenceId},
-    ${booking.paymentId}, ${booking.paymentUrl}, ${booking.paidAt}, ${booking.notes},
+    ${booking.paymentId}, ${booking.paymentUrl}, ${booking.paidAt}, ${notes},
     ${booking.receiptKey}, ${booking.receiptName}
   )`;
 }
@@ -80,7 +109,7 @@ export async function listBookings(): Promise<Booking[]> {
   await ensureBookingsSchema();
   const sql = database();
   const rows = await sql`SELECT * FROM bookings ORDER BY appointment_date ASC, appointment_time ASC`;
-  return rows.map((row) => mapBooking(row as Record<string, unknown>));
+  return Promise.all(rows.map((row) => mapBooking(row as Record<string, unknown>)));
 }
 
 export async function updateBookingStatus(id: string, status: string) {
@@ -100,7 +129,7 @@ export async function getBooking(id: string): Promise<Booking | null> {
   await ensureBookingsSchema();
   const sql = database();
   const rows = await sql`SELECT * FROM bookings WHERE id = ${id} LIMIT 1`;
-  return rows[0] ? mapBooking(rows[0] as Record<string, unknown>) : null;
+  return rows[0] ? await mapBooking(rows[0] as Record<string, unknown>) : null;
 }
 
 export async function listUnavailableTimes(appointmentDate: string): Promise<string[]> {
@@ -135,13 +164,19 @@ export async function updatePaymentResult(input: {
     WHERE id = ${input.bookingId}`;
 }
 
-function mapBooking(row: Record<string, unknown>): Booking {
+async function mapBooking(row: Record<string, unknown>): Promise<Booking> {
+  const [clientName, whatsapp, email, notes] = await Promise.all([
+    decryptSensitive(row.client_name),
+    decryptSensitive(row.whatsapp),
+    decryptSensitive(row.email),
+    decryptSensitive(row.notes),
+  ]);
   return {
     id: String(row.id),
     createdAt: Number(row.created_at),
-    clientName: String(row.client_name),
-    whatsapp: String(row.whatsapp),
-    email: row.email ? String(row.email) : null,
+    clientName: clientName || '',
+    whatsapp: whatsapp || '',
+    email,
     service: String(row.service),
     serviceLabel: String(row.service_label),
     appointmentDate: String(row.appointment_date),
@@ -158,7 +193,7 @@ function mapBooking(row: Record<string, unknown>): Booking {
     paymentId: row.payment_id ? String(row.payment_id) : null,
     paymentUrl: row.payment_url ? String(row.payment_url) : null,
     paidAt: row.paid_at ? Number(row.paid_at) : null,
-    notes: row.notes ? String(row.notes) : null,
+    notes,
     receiptKey: row.receipt_key ? String(row.receipt_key) : null,
     receiptName: row.receipt_name ? String(row.receipt_name) : null,
   };

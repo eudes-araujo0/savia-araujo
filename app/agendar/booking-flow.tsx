@@ -25,9 +25,9 @@ type BookingData = {
 
 const initialData: BookingData = { service: '', date: '', time: '', name: '', whatsapp: '', email: '', notes: '', paymentOption: 'deposit' };
 
-type Props = { initialService: string; initialPayment: string; initialBooking: string };
+type Props = { initialService: string; initialPayment: string; initialBooking: string; initialPaymentId: string };
 
-export default function BookingFlow({ initialService, initialPayment, initialBooking }: Props) {
+export default function BookingFlow({ initialService, initialPayment, initialBooking, initialPaymentId }: Props) {
   const requestedService = services.some((service) => service.code === initialService) ? initialService : '';
   const returnedFromPayment = Boolean(initialPayment && initialBooking);
   const [step, setStep] = useState(returnedFromPayment ? 4 : 1);
@@ -41,6 +41,20 @@ export default function BookingFlow({ initialService, initialPayment, initialBoo
   const [paymentAmountCents, setPaymentAmountCents] = useState(0);
   const [paymentNotice, setPaymentNotice] = useState('');
   const [returnStatus] = useState(returnedFromPayment ? initialPayment : '');
+
+  useEffect(() => {
+    if (initialPayment !== 'success' || !initialBooking || !initialPaymentId) return;
+    fetch('/api/payments/reconcile', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ bookingId: initialBooking, paymentId: initialPaymentId, action: 'sync' }),
+    })
+      .then(async (response) => ({ ok: response.ok, result: await response.json() as { error?: string } }))
+      .then(({ ok, result }) => {
+        setPaymentNotice(ok ? 'Pagamento conferido e reserva atualizada.' : (result.error || 'A confirmação automática ainda está sendo processada.'));
+      })
+      .catch(() => setPaymentNotice('A confirmação automática ainda está sendo processada.'));
+  }, [initialBooking, initialPayment, initialPaymentId]);
 
   useEffect(() => {
     if (!data.date) return;
@@ -174,7 +188,7 @@ export default function BookingFlow({ initialService, initialPayment, initialBoo
               <div className="success-icon">{paymentUrl ? <CreditCard size={28} /> : <Check size={30} />}</div>
               <span className="booking-step-label">{returnStatus === 'success' ? 'Pagamento recebido' : paymentUrl ? 'Horário pré-reservado' : 'Solicitação recebida'}</span>
               <h2>{returnStatus === 'success' ? <>Reserva<br />confirmada.</> : paymentUrl ? <>Falta apenas<br />o sinal.</> : <>Seu momento<br />já começou.</>}</h2>
-              {returnStatus === 'success' ? <p>O pagamento foi recebido e a confirmação automática está sendo registrada. Você também receberá os detalhes pelo WhatsApp.</p> : paymentUrl ? <p>Para confirmar o horário, faça o pagamento de <strong>{money(paymentAmountCents)}</strong> pelo Mercado Pago.</p> : <p>{paymentNotice || 'Recebemos seu pedido. A equipe entrará em contato pelo WhatsApp para concluir os detalhes.'}</p>}
+              {returnStatus === 'success' ? <p>{paymentNotice || 'O pagamento foi recebido e a confirmação automática está sendo registrada. Você também receberá os detalhes pelo WhatsApp.'}</p> : paymentUrl ? <p>Para confirmar o horário, faça o pagamento de <strong>{money(paymentAmountCents)}</strong> pelo Mercado Pago.</p> : <p>{paymentNotice || 'Recebemos seu pedido. A equipe entrará em contato pelo WhatsApp para concluir os detalhes.'}</p>}
               {paymentMode === 'demo' && paymentUrl && <p className="demo-payment-note">Demonstração: nenhuma cobrança real será feita.</p>}
               <p className="demo-note">Código da solicitação: {bookingId}</p>
               {paymentUrl && !returnStatus && <a className="button button-dark" href={paymentUrl}>{paymentMode === 'demo' ? 'Simular pagamento escolhido' : 'Pagar no Mercado Pago'} <ArrowRight size={16} /></a>}

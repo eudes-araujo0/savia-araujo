@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { CalendarDays, CircleDollarSign, Clock3, LayoutDashboard, ReceiptText, Search, Sparkles, Users } from 'lucide-react';
+import { CalendarDays, CircleDollarSign, Clock3, LayoutDashboard, ReceiptText, RefreshCw, Search, Sparkles, Users } from 'lucide-react';
 import type { Booking } from '../../db/schema';
 
 type View = 'visao-geral' | 'agenda' | 'clientes' | 'clientes-pendentes' | 'financeiro' | 'comprovantes';
@@ -27,7 +27,32 @@ export default function AdminDashboard({ initialBookings, username, signOutPath 
   const [view, setView] = useState<View>('visao-geral');
   const [query, setQuery] = useState('');
   const [agendaDate, setAgendaDate] = useState(todayInSaoPaulo());
+  const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [busyPayment, setBusyPayment] = useState('');
   const today = useMemo(() => todayInSaoPaulo(), []);
+
+  const refreshBookings = useCallback(async (successMessage = '') => {
+    setRefreshing(true);
+    try {
+      const response = await fetch('/api/bookings', { cache: 'no-store' });
+      const result = await response.json() as { bookings?: Booking[]; error?: string };
+      if (!response.ok) throw new Error(result.error || 'Não foi possível atualizar o painel.');
+      setBookings(result.bookings || []);
+      if (successMessage) setFeedback({ kind: 'success', message: successMessage });
+    } catch (error) {
+      setFeedback({ kind: 'error', message: error instanceof Error ? error.message : 'Não foi possível atualizar o painel.' });
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const handleFocus = () => { void refreshBookings(); };
+    window.addEventListener('focus', handleFocus);
+    const interval = window.setInterval(() => { void refreshBookings(); }, 30000);
+    return () => { window.removeEventListener('focus', handleFocus); window.clearInterval(interval); };
+  }, [refreshBookings]);
 
   const activeBookings = useMemo(() => bookings.filter((booking) => booking.status !== 'cancelado'), [bookings]);
   const paidBookings = useMemo(() => activeBookings.filter((booking) => booking.paymentStatus === 'pago'), [activeBookings]);
@@ -75,9 +100,36 @@ export default function AdminDashboard({ initialBookings, username, signOutPath 
 
   async function changeStatus(id: string, status: string) {
     const before = bookings;
+    setFeedback(null);
     setBookings((current) => current.map((booking) => booking.id === id ? { ...booking, status } : booking));
     const response = await fetch('/api/bookings', { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, status }) });
-    if (!response.ok) setBookings(before);
+    const result = await response.json() as { error?: string };
+    if (!response.ok) {
+      setBookings(before);
+      setFeedback({ kind: 'error', message: result.error || 'Não foi possível alterar o status.' });
+      return;
+    }
+    await refreshBookings('Status do atendimento atualizado.');
+  }
+
+  async function changePayment(id: string, action: 'sync' | 'manual-paid') {
+    if (action === 'manual-paid' && !window.confirm('Confirmar manualmente que este pagamento foi recebido?')) return;
+    setBusyPayment(id);
+    setFeedback(null);
+    try {
+      const response = await fetch('/api/payments/reconcile', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ bookingId: id, action }),
+      });
+      const result = await response.json() as { error?: string };
+      if (!response.ok) throw new Error(result.error || 'Não foi possível conferir o pagamento.');
+      await refreshBookings(action === 'manual-paid' ? 'Pagamento confirmado manualmente.' : 'Pagamento sincronizado com o Mercado Pago.');
+    } catch (error) {
+      setFeedback({ kind: 'error', message: error instanceof Error ? error.message : 'Não foi possível conferir o pagamento.' });
+    } finally {
+      setBusyPayment('');
+    }
   }
 
   return (
@@ -99,8 +151,9 @@ export default function AdminDashboard({ initialBookings, username, signOutPath 
       <section className="admin-main">
         <header className="admin-header">
           <div><p>{longDate(today)}</p><h1>{navigation.find((item) => item.id === view)?.label}</h1></div>
-          <span className="admin-date">{bookings.length} agendamentos registrados</span>
+          <div className="admin-header-actions"><span className="admin-date">{bookings.length} agendamentos registrados</span><button className="admin-refresh" onClick={() => void refreshBookings('Painel atualizado.')} disabled={refreshing}><RefreshCw size={14} className={refreshing ? 'spinning' : ''} /> Atualizar</button></div>
         </header>
+        {feedback && <p className={`admin-feedback ${feedback.kind}`}>{feedback.message}</p>}
 
         {view === 'visao-geral' && <>
           {!bookings.length && <p className="admin-demo-banner">O painel está pronto e conectado ao banco. Faça um agendamento de demonstração pelo site para ver o fluxo completo aparecer aqui.</p>}
@@ -147,7 +200,7 @@ export default function AdminDashboard({ initialBookings, username, signOutPath 
 
         {view === 'clientes-pendentes' && <section className="admin-panel admin-view-panel">
           <div className="panel-head"><div><h2>Clientes pendentes</h2><span>Solicitações ainda sem pagamento aprovado</span></div><strong>{pendingBookings.length}</strong></div>
-          <PendingClients bookings={pendingBookings} />
+          <PendingClients bookings={pendingBookings} busyPayment={busyPayment} onPaymentAction={changePayment} />
         </section>}
 
         {view === 'financeiro' && <>
@@ -178,6 +231,7 @@ export default function AdminDashboard({ initialBookings, username, signOutPath 
                   {booking.paymentId && <small>{booking.paymentProvider === 'demo' ? 'Demonstração' : 'Mercado Pago'} · {booking.paymentId}</small>}
                   {booking.receiptKey && <a className="receipt-link" href={`/api/receipts/${booking.id}`} target="_blank">Abrir comprovante enviado</a>}
                   {!booking.paymentId && !booking.receiptKey && <small>Aguardando pagamento</small>}
+                  {booking.paymentStatus !== 'pago' && <PaymentActions booking={booking} busy={busyPayment === booking.id} onAction={changePayment} />}
                 </div>
               </article>
             ))}
@@ -216,16 +270,24 @@ function FinanceTable({ bookings }: { bookings: Booking[] }) {
   ))}</tbody></table></div>;
 }
 
-function PendingClients({ bookings }: { bookings: Booking[] }) {
+function PendingClients({ bookings, busyPayment, onPaymentAction }: { bookings: Booking[]; busyPayment: string; onPaymentAction: (id: string, action: 'sync' | 'manual-paid') => void }) {
   if (!bookings.length) return <div className="empty-state">Nenhuma cliente aguardando pagamento.</div>;
   return <div className="payment-list">{bookings.map((booking) => (
     <article className="payment-row" key={booking.id}>
       <div><strong>{booking.clientName}</strong><small>{booking.whatsapp}{booking.email ? ` · ${booking.email}` : ''}</small></div>
       <div><strong>{booking.serviceLabel}</strong><small>{formatDate(booking.appointmentDate)} · {booking.appointmentTime}</small></div>
       <div><strong>{booking.paymentAmountCents ? money(booking.paymentAmountCents) : 'Sob consulta'}</strong><small>{booking.paymentOption === 'full' ? 'Pagamento integral' : 'Sinal de 50%'}</small></div>
-      <span className={`payment-pill ${booking.paymentStatus}`}>{paymentLabel(booking.paymentStatus)}</span>
+      <div><span className={`payment-pill ${booking.paymentStatus}`}>{paymentLabel(booking.paymentStatus)}</span><PaymentActions booking={booking} busy={busyPayment === booking.id} onAction={onPaymentAction} /></div>
     </article>
   ))}</div>;
+}
+
+function PaymentActions({ booking, busy, onAction }: { booking: Booking; busy: boolean; onAction: (id: string, action: 'sync' | 'manual-paid') => void }) {
+  if (booking.paymentAmountCents <= 0) return null;
+  return <div className="payment-actions">
+    {booking.paymentProvider === 'mercado_pago' && <button type="button" disabled={busy} onClick={() => onAction(booking.id, 'sync')}>{busy ? 'Conferindo...' : 'Sincronizar MP'}</button>}
+    <button type="button" className="manual" disabled={busy} onClick={() => onAction(booking.id, 'manual-paid')}>Marcar como pago</button>
+  </div>;
 }
 
 function groupClients(bookings: Booking[]) {

@@ -11,6 +11,9 @@ Projeto completo em Next.js para publicar na Vercel, com banco PostgreSQL da Neo
 - modo de demonstração sem cobrança real;
 - login administrativo por usuário e senha;
 - agenda, clientes pagos, clientes pendentes, financeiro e pagamentos no painel;
+- sincronização automática e manual do status aprovado no Mercado Pago;
+- criptografia AES-GCM dos dados pessoais e rate limit persistente no login;
+- RLS ativo no PostgreSQL e acesso administrativo exclusivo da conta master;
 - criação automática das tabelas no primeiro acesso ao banco.
 
 ## 1. Preparar o projeto localmente
@@ -42,17 +45,28 @@ Cadastre estas variáveis em **Vercel > Project > Settings > Environment Variabl
 | `DATABASE_URL` | Connection string fornecida pela Neon. |
 | `NEXT_PUBLIC_SITE_URL` | URL final, por exemplo `https://savia-araujo.vercel.app`. |
 | `ADMIN_USERNAME` | Usuário do painel administrativo. |
-| `ADMIN_PASSWORD` | Senha forte do painel. |
+| `ADMIN_PASSWORD_HASH` | Hash PBKDF2 da senha do painel (recomendado). |
+| `ADMIN_PASSWORD` | Compatibilidade temporária; remova após configurar o hash. |
 | `ADMIN_SESSION_SECRET` | Segredo longo e aleatório para assinar a sessão. |
+| `DATA_ENCRYPTION_KEY` | Segredo com 32 ou mais caracteres para criptografar nome, contato e observações. |
 | `PAYMENTS_DEMO_MODE` | `true` para demonstração; `false` para cobrança real. |
 | `MERCADO_PAGO_ACCESS_TOKEN` | Access Token da aplicação no Mercado Pago. |
 | `MERCADO_PAGO_WEBHOOK_SECRET` | Assinatura secreta configurada no webhook. |
 
-Nunca publique o arquivo `.env.local` nem coloque senhas diretamente no código. Para gerar um segredo no PowerShell:
+Nunca publique o arquivo `.env.local` nem coloque senhas ou chaves diretamente no código. Para gerar os segredos no PowerShell:
 
 ```powershell
 [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
 ```
+
+Para gerar o hash da senha sem gravar a senha no histórico do terminal:
+
+```powershell
+$senha = Read-Host "Senha master da Sávia" -MaskInput
+$senha | npm run hash-password --silent
+```
+
+Copie apenas o resultado para `ADMIN_PASSWORD_HASH`. Depois remova `ADMIN_PASSWORD` da Vercel. A aplicação usa o hash quando as duas variáveis existem.
 
 Durante a apresentação, use `PAYMENTS_DEMO_MODE=true` e deixe as duas variáveis do Mercado Pago vazias. Para produção, altere para `false`, informe as credenciais do Mercado Pago e faça um novo deploy.
 
@@ -91,6 +105,19 @@ https://SEU-DOMINIO/api/mercado-pago/webhook
 5. deixe `PAYMENTS_DEMO_MODE=false` e faça um redeploy.
 
 O agendamento nasce como pendente. A cliente escolhe pagar o sinal de 50% ou o valor integral, e a reserva só muda para confirmada quando o Mercado Pago aprova o valor escolhido. Solicitações sem aprovação ficam em **Clientes pendentes**; os indicadores financeiros consideram apenas pagamentos aprovados. O comprovante é o próprio identificador digital da transação mostrado no painel; não há upload manual de arquivos.
+
+Ao retornar do checkout, o site confere o pagamento diretamente na API do Mercado Pago. O painel também atualiza ao recuperar o foco e a cada 30 segundos. Se a notificação atrasar, use **Sincronizar MP**; somente a sessão master pode usar **Marcar como pago**. Essa confirmação manual deve ser usada apenas após conferir a transação.
+
+## Segurança aplicada
+
+- segredos somente em variáveis de ambiente do servidor;
+- cookies de sessão `HttpOnly`, `Secure` em produção, `SameSite=Strict` e assinatura HMAC verificada;
+- senha master com PBKDF2-SHA256 e 310 mil iterações;
+- bloqueio por 15 minutos após cinco falhas de login;
+- validação estrita de campos, bloqueio de campos extras e rejeição de uploads públicos;
+- dados pessoais criptografados com AES-GCM antes de serem gravados;
+- RLS forçado nas tabelas `bookings` e `login_attempts`, além da revogação de acesso do papel `PUBLIC`;
+- endpoints administrativos e arquivos restritos à sessão master.
 
 ## Acessos
 

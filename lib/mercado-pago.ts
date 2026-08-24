@@ -3,6 +3,16 @@ import { runtimeFlag, runtimeValue } from './runtime-env';
 
 export type PaymentMode = 'mercado_pago' | 'demo' | 'unavailable';
 
+export type MercadoPagoPayment = {
+  id?: number | string;
+  status?: string;
+  external_reference?: string;
+  transaction_amount?: number;
+  currency_id?: string;
+  date_approved?: string | null;
+  date_created?: string | null;
+};
+
 export function getPaymentMode(): PaymentMode {
   if (runtimeFlag('PAYMENTS_DEMO_MODE')) return 'demo';
   return runtimeValue('MERCADO_PAGO_ACCESS_TOKEN') ? 'mercado_pago' : 'unavailable';
@@ -84,16 +94,32 @@ export async function fetchMercadoPagoPayment(paymentId: string) {
   const response = await fetch(`https://api.mercadopago.com/v1/payments/${encodeURIComponent(paymentId)}`, {
     headers: { authorization: `Bearer ${runtimeValue('MERCADO_PAGO_ACCESS_TOKEN')}` },
   });
-  const result = await response.json() as {
-    id?: number | string;
-    status?: string;
-    external_reference?: string;
-    transaction_amount?: number;
-    currency_id?: string;
-    date_approved?: string | null;
-  };
+  const result = await response.json() as MercadoPagoPayment;
   if (!response.ok || !result.id) throw new Error('Pagamento não encontrado no Mercado Pago.');
   return result;
+}
+
+export async function findMercadoPagoPayment(bookingId: string) {
+  const url = new URL('https://api.mercadopago.com/v1/payments/search');
+  url.searchParams.set('external_reference', bookingId);
+  url.searchParams.set('sort', 'date_created');
+  url.searchParams.set('criteria', 'desc');
+  url.searchParams.set('limit', '20');
+  const response = await fetch(url, {
+    headers: { authorization: `Bearer ${runtimeValue('MERCADO_PAGO_ACCESS_TOKEN')}` },
+  });
+  const result = await response.json() as { results?: MercadoPagoPayment[] };
+  if (!response.ok) throw new Error('Não foi possível consultar o pagamento no Mercado Pago.');
+  const payments = (result.results || []).filter((payment) => payment.external_reference === bookingId);
+  return payments.find((payment) => payment.status === 'approved') || payments[0] || null;
+}
+
+export function mapMercadoPagoPaymentStatus(status: string) {
+  if (status === 'approved') return 'pago';
+  if (['pending', 'in_process', 'authorized'].includes(status)) return 'em_analise';
+  if (['refunded', 'charged_back'].includes(status)) return 'estornado';
+  if (status === 'cancelled') return 'cancelado';
+  return 'rejeitado';
 }
 
 async function createDemoToken(bookingId: string) {

@@ -222,7 +222,14 @@ footer > small { justify-self: end; color: rgba(243,237,226,.34); font-size: 8px
 .admin-header { display: flex; align-items: center; justify-content: space-between; gap: 30px; }
 .admin-header p { margin: 0 0 7px; color: #847a6d; font-size: 9px; text-transform: uppercase; letter-spacing: .13em; }
 .admin-header h1 { margin: 0; font-family: var(--font-display), serif; font-size: 39px; font-weight: 500; }
+.admin-header-actions { display: flex; align-items: center; gap: 10px; }
 .admin-date { padding: 11px 15px; border: 1px solid #ded8ce; background: white; font-size: 10px; }
+.admin-refresh { display: inline-flex; align-items: center; gap: 7px; border: 1px solid #d7c8ab; background: #171510; padding: 11px 14px; cursor: pointer; color: var(--gold); font-size: 8px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.admin-refresh:disabled, .payment-actions button:disabled { cursor: wait; opacity: .55; }
+.admin-refresh .spinning { animation: spin .8s linear infinite; }
+.admin-feedback { margin: 18px 0 0; border: 1px solid; padding: 11px 14px; font-size: 9px; }
+.admin-feedback.success { border-color: #bed2c2; background: #e8f1e9; color: #376442; }
+.admin-feedback.error { border-color: #dec0bd; background: #f6e8e6; color: #8a3e39; }
 .admin-demo-banner { margin: 26px 0 0; border-left: 3px solid var(--gold); background: #fffaf0; padding: 12px 15px; color: #786b58; font-size: 10px; line-height: 1.6; }
 .stat-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 13px; margin-top: 26px; }
 .stat-card { min-width: 0; border: 1px solid #e1dbd1; background: #fbfaf7; padding: 20px; }
@@ -296,6 +303,11 @@ footer > small { justify-self: end; color: rgba(243,237,226,.34); font-size: 8px
 .payment-pill.em_analise, .payment-pill.aguardando { background: #f5e8ca; color: #8d6521; }
 .payment-pill.rejeitado, .payment-pill.cancelado, .payment-pill.estornado { background: #f0dddd; color: #8a3e39; }
 .payment-proof { min-width: 0; }
+.payment-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.payment-actions button { border: 1px solid #c9a85f; background: #171510; padding: 7px 9px; cursor: pointer; color: #e2be70; font-size: 7px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+.payment-actions button.manual { border-color: #d5cec2; background: #fff; color: #70685d; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
 
 /* Admin login and payment demo */
 .admin-login-page { min-height: 100svh; display: grid; grid-template-columns: minmax(400px,.9fr) 1.1fr; background: var(--cream); color: var(--ink); }
@@ -400,6 +412,7 @@ footer > small { justify-self: end; color: rgba(243,237,226,.34); font-size: 8px
   .admin-user { display: none; }
   .admin-main { padding: 26px 15px 55px; }
   .admin-date { display: none; }
+  .admin-header-actions { margin-left: auto; }
   .stat-grid { grid-template-columns: 1fr 1fr; }
   .stat-card { padding: 16px; }
   .appointment-row { padding-inline: 14px; }

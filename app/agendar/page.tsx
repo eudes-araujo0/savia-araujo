@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: 'Escolha sua experiência de maquiagem, data e horário.',
 };
 
-export default async function BookingPage({ searchParams }: { searchParams: Promise<{ service?: string; payment?: string; booking?: string }> }) {
+export default async function BookingPage({ searchParams }: { searchParams: Promise<{ service?: string; payment?: string; booking?: string; payment_id?: string; collection_id?: string }> }) {
   const params = await searchParams;
-  return <BookingFlow initialService={params.service || ''} initialPayment={params.payment || ''} initialBooking={params.booking || ''} />;
+  return <BookingFlow initialService={params.service || ''} initialPayment={params.payment || ''} initialBooking={params.booking || ''} initialPaymentId={params.payment_id || params.collection_id || ''} />;
 }
