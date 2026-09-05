@@ -2,7 +2,7 @@
 
 import { upload } from '@vercel/blob/client';
 import Image from 'next/image';
-import { useEffect, useMemo, useState, type PointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
 import { Check, History, ImagePlus, LoaderCircle, Monitor, Move, RotateCcw, Smartphone, X } from 'lucide-react';
 import type { SiteMediaLibraryItem } from '../../lib/site-media';
 
@@ -28,6 +28,7 @@ export default function MediaManager() {
   const [saving, setSaving] = useState(false);
   const [progress, setProgress] = useState(0);
   const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+  const uploadAbort = useRef<AbortController | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -80,18 +81,21 @@ export default function MediaManager() {
   async function save(urlOverride?: string, pathnameOverride?: string | null, resetToDefault = false) {
     if (!editor || saving) return;
     setSaving(true); setProgress(0); setFeedback(null);
+    const controller = new AbortController();
+    uploadAbort.current = controller;
+    const timeout = window.setTimeout(() => controller.abort(), 45000);
     try {
       let url = urlOverride || editor.item.current.url;
       let pathname = pathnameOverride === undefined ? editor.item.current.pathname : pathnameOverride;
       if (editor.file && !urlOverride) {
         const filename = safeFilename(editor.file.name);
-        const blob = await upload(`savia/site-media/${editor.item.id}/${filename}`, editor.file, {
-          access: 'public',
-          handleUploadUrl: '/api/admin/media/upload',
-          clientPayload: JSON.stringify({ slotId: editor.item.id }),
-          multipart: editor.file.size > 4 * 1024 * 1024,
-          onUploadProgress: ({ percentage }) => setProgress(Math.round(percentage)),
-        });
+        const blob = editor.file.size <= 4 * 1024 * 1024
+          ? await uploadSmallImage(editor.item.id, filename, editor.file, controller.signal, setProgress)
+          : await upload(`savia/site-media/${editor.item.id}/${filename}`, editor.file, {
+              access: 'public', handleUploadUrl: '/api/admin/media/upload', clientPayload: JSON.stringify({ slotId: editor.item.id }),
+              multipart: true, abortSignal: controller.signal,
+              onUploadProgress: ({ percentage }) => setProgress(Math.round(percentage)),
+            });
         url = blob.url;
         pathname = blob.pathname;
       }
@@ -105,7 +109,7 @@ export default function MediaManager() {
           mobileY: resetToDefault ? editor.item.mobileY : editor.mobileY,
           desktopZoom: resetToDefault ? editor.item.desktopZoom : editor.desktopZoom,
           mobileZoom: resetToDefault ? editor.item.mobileZoom : editor.mobileZoom,
-        }),
+        }), signal: controller.signal,
       });
       const result = await response.json() as { items?: SiteMediaLibraryItem[]; error?: string };
       if (!response.ok) throw new Error(result.error || 'Não foi possível publicar a imagem.');
@@ -113,9 +117,9 @@ export default function MediaManager() {
       closeEditor();
       setFeedback({ kind: 'success', text: 'Imagem e enquadramentos publicados no site.' });
     } catch (error) {
-      setFeedback({ kind: 'error', text: error instanceof Error ? error.message : 'Não foi possível publicar a imagem.' });
+      setFeedback({ kind: 'error', text: error instanceof DOMException && error.name === 'AbortError' ? 'O envio demorou demais e foi cancelado. Tente novamente ou use outra conexão.' : error instanceof Error ? error.message : 'Não foi possível publicar a imagem.' });
     } finally {
-      setSaving(false); setProgress(0);
+      window.clearTimeout(timeout); uploadAbort.current = null; setSaving(false); setProgress(0);
     }
   }
 
@@ -192,7 +196,7 @@ export default function MediaManager() {
             {editor.item.versions.length > 0 && <div className="media-history"><strong><History size={14} /> Histórico</strong><div>{editor.item.versions.slice(0, 5).map((version) => <button key={version.versionId} onClick={() => void restore(version.versionId || '')} disabled={saving}><Image src={version.url} alt="Versão anterior" width={42} height={42} /><span>{version.updatedAt ? new Date(version.updatedAt).toLocaleDateString('pt-BR') : 'Versão salva'}</span><RotateCcw size={13} /></button>)}</div></div>}
           </div>
         </div>
-        <footer><button className="media-reset" onClick={() => void save(editor.item.defaultUrl, null, true)} disabled={saving}><RotateCcw size={14} /> Usar foto original</button><button className="admin-create" onClick={() => void save()} disabled={saving || editor.alt.trim().length < 3}>{saving ? <><LoaderCircle className="spinning" size={15} /> {progress ? `Enviando ${progress}%` : 'Publicando…'}</> : 'Publicar no site'}</button></footer>
+        <footer><button className="media-reset" onClick={() => saving ? uploadAbort.current?.abort() : void save(editor.item.defaultUrl, null, true)}><RotateCcw size={14} /> {saving ? 'Cancelar envio' : 'Usar foto original'}</button><button className="admin-create" onClick={() => void save()} disabled={saving || editor.alt.trim().length < 3}>{saving ? <><LoaderCircle className="spinning" size={15} /> {progress ? `Enviando ${progress}%` : 'Publicando…'}</> : 'Publicar no site'}</button></footer>
       </section>
     </div>}
   </>;
@@ -203,4 +207,16 @@ function safeFilename(value: string) {
   const extension = value.toLowerCase().match(/\.(jpe?g|png|webp|avif)$/)?.[0] || '.jpg';
   const name = value.replace(/\.[^.]+$/, '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9-]+/gi, '-').replace(/^-|-$/g, '').slice(0, 60) || 'imagem';
   return `${name}${extension}`;
+}
+
+async function uploadSmallImage(slotId: string, filename: string, file: File, signal: AbortSignal, onProgress: (value: number) => void) {
+  onProgress(15);
+  const response = await fetch(`/api/admin/media/upload?slotId=${encodeURIComponent(slotId)}&filename=${encodeURIComponent(filename)}`, {
+    method: 'PUT', headers: { 'content-type': file.type }, body: file, signal,
+  });
+  onProgress(85);
+  const result = await response.json() as { url?: string; pathname?: string; error?: string };
+  if (!response.ok || !result.url || !result.pathname) throw new Error(result.error || 'Não foi possível enviar a imagem.');
+  onProgress(100);
+  return { url: result.url, pathname: result.pathname };
 }
