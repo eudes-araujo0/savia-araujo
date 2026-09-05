@@ -10,12 +10,14 @@ gsap.registerPlugin(ScrollTrigger);
 
 type PortfolioItem = {
   src: string;
+  mobileSrc?: string;
   poster?: string;
   alt: string;
   category: 'social' | 'noivas' | 'boss';
   title: string;
   size: 'tall' | 'wide' | 'standard';
   position?: string;
+  mobilePosition?: string;
   type: 'image' | 'video';
 };
 
@@ -26,6 +28,9 @@ const portfolio: PortfolioItem[] = [
     category: 'boss',
     title: 'Boss Portrait',
     size: 'tall',
+    position: 'center 18%',
+    mobileSrc: '/media/boss-corset.webp',
+    mobilePosition: 'center 16%',
     type: 'image',
   },
   {
@@ -34,6 +39,7 @@ const portfolio: PortfolioItem[] = [
     category: 'noivas',
     title: 'Bridal Morning',
     size: 'wide',
+    position: 'center 25%',
     type: 'image',
   },
   {
@@ -42,6 +48,7 @@ const portfolio: PortfolioItem[] = [
     category: 'social',
     title: 'Soft Glam',
     size: 'standard',
+    position: 'center 18%',
     type: 'image',
   },
   {
@@ -51,6 +58,7 @@ const portfolio: PortfolioItem[] = [
     category: 'noivas',
     title: 'Do Pincel ao Sim',
     size: 'tall',
+    position: 'center 32%',
     type: 'video',
   },
   {
@@ -68,6 +76,7 @@ const portfolio: PortfolioItem[] = [
     category: 'social',
     title: 'Melanin Glow',
     size: 'standard',
+    position: 'center 17%',
     type: 'image',
   },
   {
@@ -76,6 +85,7 @@ const portfolio: PortfolioItem[] = [
     category: 'noivas',
     title: 'The Final Touch',
     size: 'standard',
+    position: 'center 24%',
     type: 'image',
   },
   {
@@ -84,6 +94,7 @@ const portfolio: PortfolioItem[] = [
     category: 'boss',
     title: 'Presence',
     size: 'wide',
+    position: 'center 20%',
     type: 'image',
   },
   {
@@ -101,6 +112,7 @@ const portfolio: PortfolioItem[] = [
     category: 'social',
     title: 'Modern Glam',
     size: 'standard',
+    position: 'center 18%',
     type: 'image',
   },
   {
@@ -109,6 +121,7 @@ const portfolio: PortfolioItem[] = [
     category: 'boss',
     title: 'The Artist',
     size: 'tall',
+    position: 'center 16%',
     type: 'image',
   },
 ];
@@ -273,9 +286,12 @@ export default function Home() {
           {visiblePortfolio.map((item, index) => (
             <article className={`portfolio-card ${item.size}`} key={item.title} data-reveal>
               {item.type === 'video' ? (
-                <video src={item.src} poster={item.poster} aria-label={item.alt} autoPlay muted loop playsInline controls preload="metadata" />
+                <video src={item.src} poster={item.poster} aria-label={item.alt} autoPlay muted loop playsInline controls preload="metadata" style={item.position ? { objectPosition: item.position } : undefined} />
               ) : (
-                <Image src={item.src} alt={item.alt} fill sizes="(max-width: 760px) 100vw, (max-width: 1050px) 50vw, 35vw" style={item.position ? { objectPosition: item.position } : undefined} />
+                <>
+                  <Image className={item.mobileSrc ? 'portfolio-image-desktop' : undefined} src={item.src} alt={item.alt} fill sizes="(max-width: 760px) 100vw, (max-width: 1050px) 50vw, 35vw" style={item.position ? { objectPosition: item.position } : undefined} />
+                  {item.mobileSrc && <Image className="portfolio-image-mobile" src={item.mobileSrc} alt={item.alt} fill sizes="100vw" style={{ objectPosition: item.mobilePosition || 'center' }} />}
+                </>
               )}
               <div className="portfolio-overlay"><span>{String(index + 1).padStart(2, '0')}</span><h3>{item.title}</h3><ArrowUpRight size={22} /></div>
             </article>
@@ -334,8 +350,8 @@ export default function Home() {
 
       <section className="boss-section" id="boss">
         <div className="boss-visual" data-reveal>
-          <Image className="boss-primary" src="/media/boss-cover-bw.webp" alt="Retrato profissional em preto e branco do Pacote Boss" width={1359} height={2074} sizes="(max-width: 760px) 82vw, 38vw" />
-          <Image className="boss-secondary" src="/media/boss-brown-editorial.webp" alt="Retrato editorial com direção de poses" width={1063} height={1594} sizes="(max-width: 760px) 45vw, 22vw" />
+          <Image className="boss-primary" src="/media/boss-cover-bw-4k.webp" alt="Retrato profissional em preto e branco do Pacote Boss" width={2516} height={3840} sizes="(max-width: 760px) 82vw, 38vw" quality={95} />
+          <Image className="boss-secondary" src="/media/boss-brown-editorial-4k.webp" alt="Retrato editorial com direção de poses" width={2561} height={3840} sizes="(max-width: 760px) 45vw, 22vw" quality={95} />
           <span className="boss-monogram">BOSS</span>
         </div>
         <div className="boss-content" data-reveal>

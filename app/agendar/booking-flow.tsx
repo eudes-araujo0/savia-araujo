@@ -27,6 +27,7 @@ type Props = { initialService: string; initialPayment: string; initialBooking: s
 
 export default function BookingFlow({ initialService, initialPayment, initialBooking, initialPaymentId }: Props) {
   const requestedService = services.some((service) => service.code === initialService) ? initialService : '';
+  const requestedGroup = services.find((service) => service.code === requestedService)?.group || 'makeup';
   const returnedFromPayment = Boolean(initialPayment && initialBooking);
   const [step, setStep] = useState(returnedFromPayment ? 4 : 1);
   const [data, setData] = useState({ ...initialData, service: requestedService });
@@ -39,6 +40,7 @@ export default function BookingFlow({ initialService, initialPayment, initialBoo
   const [paymentAmountCents, setPaymentAmountCents] = useState(0);
   const [paymentNotice, setPaymentNotice] = useState('');
   const [returnStatus] = useState(returnedFromPayment ? initialPayment : '');
+  const [activeGroup, setActiveGroup] = useState<(typeof serviceGroups)[number]>(requestedGroup);
 
   useEffect(() => {
     if (initialPayment !== 'success' || !initialBooking || !initialPaymentId) return;
@@ -128,22 +130,26 @@ export default function BookingFlow({ initialService, initialPayment, initialBoo
             <div>
               <span className="booking-step-label">Etapa 01 · Experiência</span>
               <h2>Como você quer<br />se sentir?</h2>
-              <div className="service-groups">
+              <div className="service-group-tabs" role="tablist" aria-label="Categorias de experiências">
                 {serviceGroups.map((group) => {
-                  const groupedServices = services.filter((service) => service.group === group);
-                  return <section className="booking-service-group" key={group}>
-                    <p className="service-group-title">{groupedServices[0].groupLabel}</p>
-                    <div className="service-options">
-                      {groupedServices.map((service) => (
-                        <button type="button" key={service.code} className={`service-option ${data.service === service.code ? 'selected' : ''}`} onClick={() => setData({ ...data, service: service.code, date: '', time: '' })} aria-pressed={data.service === service.code}>
-                          <div><h3>{service.name}</h3><p>{service.note}</p></div>
-                          <strong>{money(service.priceCents)}</strong>
-                        </button>
-                      ))}
-                    </div>
-                  </section>;
+                  const label = services.find((service) => service.group === group)?.groupLabel || group;
+                  return <button type="button" role="tab" aria-selected={activeGroup === group} className={activeGroup === group ? 'active' : ''} key={group} onClick={() => setActiveGroup(group)}>{label}</button>;
                 })}
               </div>
+              <div className="service-groups">
+                <section className="booking-service-group">
+                  <p className="service-group-title">Escolha uma opção</p>
+                  <div className="service-options">
+                    {services.filter((service) => service.group === activeGroup).map((service) => (
+                      <button type="button" key={service.code} className={`service-option ${data.service === service.code ? 'selected' : ''}`} onClick={() => setData({ ...data, service: service.code, date: '', time: '' })} aria-pressed={data.service === service.code}>
+                        <div><h3>{service.name}</h3><p>{service.note}</p></div>
+                        <strong>{money(service.priceCents)}</strong>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              </div>
+              <p className="booking-trust"><ShieldCheck size={15} /> Pagamento protegido pelo Mercado Pago · sinal de 50% ou valor integral</p>
             </div>
           )}
 
@@ -205,6 +211,11 @@ export default function BookingFlow({ initialService, initialPayment, initialBoo
           )}
 
           {error && <p className="booking-error" role="alert">{error}</p>}
+          {step > 1 && step < 4 && selectedService && <div className="booking-selection-summary">
+            <div><small>Experiência</small><strong>{selectedService.name}</strong></div>
+            <div><small>Quando</small><strong>{data.date ? `${data.date.split('-').reverse().join('/')}${data.time ? ` · ${data.time}` : ''}` : 'A escolher'}</strong></div>
+            <div><small>Investimento</small><strong>{money(selectedService.priceCents)}</strong></div>
+          </div>}
           {step < 4 && (
             <div className="booking-actions">
               {step > 1 && <button className="back-button" type="button" onClick={() => setStep((current) => current - 1)}>Voltar</button>}
