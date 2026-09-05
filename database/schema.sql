@@ -135,6 +135,55 @@ BEGIN
 END
 $$;
 
+CREATE TABLE IF NOT EXISTS site_media (
+  slot_id TEXT PRIMARY KEY,
+  url TEXT NOT NULL,
+  pathname TEXT,
+  alt_text TEXT NOT NULL,
+  desktop_x NUMERIC(5,2) NOT NULL DEFAULT 50,
+  desktop_y NUMERIC(5,2) NOT NULL DEFAULT 50,
+  mobile_x NUMERIC(5,2) NOT NULL DEFAULT 50,
+  mobile_y NUMERIC(5,2) NOT NULL DEFAULT 50,
+  desktop_zoom NUMERIC(4,2) NOT NULL DEFAULT 1,
+  mobile_zoom NUMERIC(4,2) NOT NULL DEFAULT 1,
+  updated_at BIGINT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS site_media_versions (
+  id TEXT PRIMARY KEY,
+  slot_id TEXT NOT NULL,
+  url TEXT NOT NULL,
+  pathname TEXT,
+  alt_text TEXT NOT NULL,
+  desktop_x NUMERIC(5,2) NOT NULL,
+  desktop_y NUMERIC(5,2) NOT NULL,
+  mobile_x NUMERIC(5,2) NOT NULL,
+  mobile_y NUMERIC(5,2) NOT NULL,
+  desktop_zoom NUMERIC(4,2) NOT NULL,
+  mobile_zoom NUMERIC(4,2) NOT NULL,
+  created_at BIGINT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_site_media_versions_slot
+  ON site_media_versions(slot_id, created_at DESC);
+
+ALTER TABLE site_media ENABLE ROW LEVEL SECURITY;
+ALTER TABLE site_media FORCE ROW LEVEL SECURITY;
+ALTER TABLE site_media_versions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE site_media_versions FORCE ROW LEVEL SECURITY;
+REVOKE ALL ON site_media, site_media_versions FROM PUBLIC;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = current_schema() AND tablename = 'site_media' AND policyname = 'site_media_backend_only') THEN
+    CREATE POLICY site_media_backend_only ON site_media TO CURRENT_USER USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = current_schema() AND tablename = 'site_media_versions' AND policyname = 'site_media_versions_backend_only') THEN
+    CREATE POLICY site_media_versions_backend_only ON site_media_versions TO CURRENT_USER USING (true) WITH CHECK (true);
+  END IF;
+END
+$$;
+
 CREATE TABLE IF NOT EXISTS login_attempts (
   key_hash TEXT PRIMARY KEY,
   attempts INTEGER NOT NULL,

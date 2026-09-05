@@ -19,6 +19,7 @@ Projeto completo em Next.js para publicar na Vercel, com serviços de maquiagem,
 - link seguro para a cliente acompanhar, pagar novamente, cancelar ou reagendar;
 - criptografia AES-GCM dos dados pessoais e rate limit persistente no login e no agendamento;
 - RLS ativo no PostgreSQL e acesso administrativo exclusivo da conta master;
+- biblioteca visual master para trocar todas as fotos, ajustar foco, altura e zoom separadamente no computador e celular, com histórico de versões;
 - criação automática das tabelas no primeiro acesso ao banco.
 
 ## 1. Preparar o projeto localmente
@@ -54,6 +55,7 @@ Cadastre estas variáveis em **Vercel > Project > Settings > Environment Variabl
 | `ADMIN_PASSWORD` | Compatibilidade temporária; remova após configurar o hash. |
 | `ADMIN_SESSION_SECRET` | Segredo longo e aleatório para assinar a sessão. |
 | `DATA_ENCRYPTION_KEY` | Segredo com 32 ou mais caracteres para criptografar nome, contato e observações. |
+| `BLOB_READ_WRITE_TOKEN` | Token adicionado automaticamente ao conectar um Vercel Blob público ao projeto. |
 | `PAYMENTS_DEMO_MODE` | `true` para demonstração; `false` para cobrança real. |
 | `PAYMENT_PROVIDER` | Use `infinitepay` para a integração principal. |
 | `INFINITEPAY_HANDLE` | InfiniteTag da Sávia, sem o caractere `$`. |
@@ -87,6 +89,18 @@ $senha | npm run hash-password --silent
 Copie apenas o resultado para `ADMIN_PASSWORD_HASH`. Depois remova `ADMIN_PASSWORD` da Vercel. A aplicação usa o hash quando as duas variáveis existem.
 
 Durante a apresentação, use `PAYMENTS_DEMO_MODE=true`. Para produção, altere para `false`, use `PAYMENT_PROVIDER=infinitepay`, informe a `INFINITEPAY_HANDLE` e faça um novo deploy.
+
+### Biblioteca de imagens
+
+Para Sávia trocar as fotos pelo painel:
+
+1. abra **Vercel > projeto savia-araujo > Storage**;
+2. escolha **Create Database > Blob** e crie o armazenamento com acesso **Public**;
+3. conecte-o aos ambientes Production, Preview e Development; a Vercel criará `BLOB_READ_WRITE_TOKEN` automaticamente;
+4. faça um novo deploy;
+5. entre em **Painel > Imagens do site**, escolha uma área, envie a foto, confira as abas Computador e Celular, arraste o ponto focal, ajuste o zoom e publique.
+
+Somente a sessão master recebe autorização temporária de upload. Os arquivos aceitos são JPG, PNG, WebP e AVIF, até 20 MB. Cada publicação preserva uma versão anterior para restauração. Os arquivos do Blob são públicos porque aparecem no site; dados pessoais e comprovantes continuam fora dessa biblioteca.
 
 ## 4. Publicar na Vercel
 

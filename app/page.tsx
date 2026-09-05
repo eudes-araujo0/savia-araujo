@@ -5,10 +5,15 @@ import Image from 'next/image';
 import { ArrowDownRight, ArrowUpRight, Check, Instagram, MoveRight, Sparkles } from 'lucide-react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { useSiteMedia } from '../lib/use-site-media';
+import { managedMediaStyle } from '../lib/site-media';
 
 gsap.registerPlugin(ScrollTrigger);
 
 type PortfolioItem = {
+  slot: string;
+  mobileSlot?: string;
+  posterSlot?: string;
   src: string;
   mobileSrc?: string;
   poster?: string;
@@ -23,6 +28,8 @@ type PortfolioItem = {
 
 const portfolio: PortfolioItem[] = [
   {
+    slot: 'portfolio.boss-main.desktop',
+    mobileSlot: 'portfolio.boss-main.mobile',
     src: '/media/boss-gold-portrait.webp',
     alt: 'Ensaio de beleza com maquiagem iluminada em pele negra',
     category: 'boss',
@@ -34,6 +41,7 @@ const portfolio: PortfolioItem[] = [
     type: 'image',
   },
   {
+    slot: 'portfolio.bridal-morning',
     src: '/media/bride-getting-ready-bw.jpg',
     alt: 'Noiva sorrindo durante a preparação da maquiagem',
     category: 'noivas',
@@ -43,6 +51,7 @@ const portfolio: PortfolioItem[] = [
     type: 'image',
   },
   {
+    slot: 'portfolio.soft-glam',
     src: '/media/soft-glam-white.webp',
     alt: 'Maquiagem social sofisticada com acabamento luminoso',
     category: 'social',
@@ -52,6 +61,8 @@ const portfolio: PortfolioItem[] = [
     type: 'image',
   },
   {
+    slot: 'portfolio.bridal-video-poster',
+    posterSlot: 'portfolio.bridal-video-poster',
     src: '/media/bridal-story.mp4',
     poster: '/media/bridal-story-poster.jpg',
     alt: 'Making of de noiva, da maquiagem à cerimônia',
@@ -62,6 +73,7 @@ const portfolio: PortfolioItem[] = [
     type: 'video',
   },
   {
+    slot: 'portfolio.monochrome',
     src: '/media/boss-close-bw.webp',
     alt: 'Retrato editorial em preto e branco',
     category: 'boss',
@@ -71,6 +83,7 @@ const portfolio: PortfolioItem[] = [
     type: 'image',
   },
   {
+    slot: 'portfolio.melanin',
     src: '/media/melanin-glow.jpg',
     alt: 'Maquiagem iluminada em pele negra com acabamento sofisticado',
     category: 'social',
@@ -80,6 +93,7 @@ const portfolio: PortfolioItem[] = [
     type: 'image',
   },
   {
+    slot: 'portfolio.bridal-detail',
     src: '/media/bride-detail-bw.jpg',
     alt: 'Detalhe da preparação de uma noiva em preto e branco',
     category: 'noivas',
@@ -89,6 +103,7 @@ const portfolio: PortfolioItem[] = [
     type: 'image',
   },
   {
+    slot: 'portfolio.presence',
     src: '/media/boss-brown-editorial.webp',
     alt: 'Ensaio de posicionamento com beleza e direção editorial',
     category: 'boss',
@@ -98,6 +113,7 @@ const portfolio: PortfolioItem[] = [
     type: 'image',
   },
   {
+    slot: 'portfolio.radiance',
     src: '/media/soft-glam-close.jpg',
     alt: 'Close de maquiagem soft glam com cabelo ondulado',
     category: 'social',
@@ -107,6 +123,7 @@ const portfolio: PortfolioItem[] = [
     type: 'image',
   },
   {
+    slot: 'portfolio.modern-glam',
     src: '/media/soft-glam-black.webp',
     alt: 'Maquiagem elegante com beleza natural e acessórios marcantes',
     category: 'social',
@@ -116,6 +133,7 @@ const portfolio: PortfolioItem[] = [
     type: 'image',
   },
   {
+    slot: 'portfolio.artist',
     src: '/media/savia-boss.webp',
     alt: 'Sávia Araújo em retrato profissional no estúdio',
     category: 'boss',
@@ -186,6 +204,7 @@ const bossPackages = [
 export default function Home() {
   const scope = useRef<HTMLElement>(null);
   const [filter, setFilter] = useState('todos');
+  const getMedia = useSiteMedia();
 
   useLayoutEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -199,8 +218,8 @@ export default function Home() {
         .from('.hero-lede, .hero-actions', { y: 24, autoAlpha: 0, duration: 0.75, stagger: 0.1 }, '-=.6')
         .from('.hero-proof div', { y: 18, autoAlpha: 0, duration: 0.6, stagger: 0.08 }, '-=.45');
 
-      gsap.to('.hero-image', {
-        scale: 1.08,
+      gsap.to('.hero-media', {
+        scale: 1.035,
         yPercent: 3,
         ease: 'none',
         scrollTrigger: { trigger: '.hero', start: 'top top', end: 'bottom top', scrub: 1 },
@@ -237,7 +256,7 @@ export default function Home() {
 
       <section className="hero" id="inicio">
         <div className="hero-media">
-          <Image className="hero-image" src="/media/boss-gold-portrait.webp" alt="Retrato de beleza com maquiagem iluminada e produção editorial" fill sizes="100vw" preload />
+          <Image className="hero-image managed-media" src={getMedia('home.hero').url} alt={getMedia('home.hero').alt} fill sizes="100vw" preload style={managedMediaStyle(getMedia('home.hero'))} />
         </div>
         <div className="hero-shade" />
         <div className="hero-copy">
@@ -286,11 +305,11 @@ export default function Home() {
           {visiblePortfolio.map((item, index) => (
             <article className={`portfolio-card ${item.size}`} key={item.title} data-reveal>
               {item.type === 'video' ? (
-                <video src={item.src} poster={item.poster} aria-label={item.alt} autoPlay muted loop playsInline controls preload="metadata" style={item.position ? { objectPosition: item.position } : undefined} />
+                <video className="managed-media" src={item.src} poster={getMedia(item.posterSlot || item.slot).url} aria-label={getMedia(item.posterSlot || item.slot).alt} autoPlay muted loop playsInline controls preload="metadata" style={managedMediaStyle(getMedia(item.posterSlot || item.slot))} />
               ) : (
                 <>
-                  <Image className={item.mobileSrc ? 'portfolio-image-desktop' : undefined} src={item.src} alt={item.alt} fill sizes="(max-width: 760px) 100vw, (max-width: 1050px) 50vw, 35vw" style={item.position ? { objectPosition: item.position } : undefined} />
-                  {item.mobileSrc && <Image className="portfolio-image-mobile" src={item.mobileSrc} alt={item.alt} fill sizes="100vw" style={{ objectPosition: item.mobilePosition || 'center' }} />}
+                  <Image className={`managed-media ${item.mobileSrc ? 'portfolio-image-desktop' : ''}`} src={getMedia(item.slot).url} alt={getMedia(item.slot).alt} fill sizes="(max-width: 760px) 100vw, (max-width: 1050px) 50vw, 35vw" style={managedMediaStyle(getMedia(item.slot))} />
+                  {item.mobileSrc && <Image className="portfolio-image-mobile managed-media" src={getMedia(item.mobileSlot || item.slot).url} alt={getMedia(item.mobileSlot || item.slot).alt} fill sizes="100vw" style={managedMediaStyle(getMedia(item.mobileSlot || item.slot))} />}
                 </>
               )}
               <div className="portfolio-overlay"><span>{String(index + 1).padStart(2, '0')}</span><h3>{item.title}</h3><ArrowUpRight size={22} /></div>
@@ -331,7 +350,7 @@ export default function Home() {
             </div>
           </div>
           <figure className="bridal-image" data-reveal>
-            <Image src="/media/bride-getting-ready-bw.jpg" alt="Noiva recebendo os últimos detalhes da maquiagem" fill sizes="(max-width: 760px) 100vw, 50vw" />
+            <Image className="managed-media" src={getMedia('experience.bridal').url} alt={getMedia('experience.bridal').alt} fill sizes="(max-width: 760px) 100vw, 50vw" style={managedMediaStyle(getMedia('experience.bridal'))} />
             <figcaption>Uma preparação pensada para você viver o momento.</figcaption>
           </figure>
         </div>
@@ -350,8 +369,8 @@ export default function Home() {
 
       <section className="boss-section" id="boss">
         <div className="boss-visual" data-reveal>
-          <Image className="boss-primary" src="/media/boss-cover-bw-4k.webp" alt="Retrato profissional em preto e branco do Pacote Boss" width={2516} height={3840} sizes="(max-width: 760px) 82vw, 38vw" quality={95} />
-          <Image className="boss-secondary" src="/media/boss-brown-editorial-4k.webp" alt="Retrato editorial com direção de poses" width={2561} height={3840} sizes="(max-width: 760px) 45vw, 22vw" quality={95} />
+          <Image className="boss-primary managed-media" src={getMedia('experience.boss-primary').url} alt={getMedia('experience.boss-primary').alt} width={2516} height={3840} sizes="(max-width: 760px) 82vw, 38vw" quality={95} style={managedMediaStyle(getMedia('experience.boss-primary'))} />
+          <Image className="boss-secondary managed-media" src={getMedia('experience.boss-secondary').url} alt={getMedia('experience.boss-secondary').alt} width={2561} height={3840} sizes="(max-width: 760px) 45vw, 22vw" quality={95} style={managedMediaStyle(getMedia('experience.boss-secondary'))} />
           <span className="boss-monogram">BOSS</span>
         </div>
         <div className="boss-content" data-reveal>
@@ -379,7 +398,7 @@ export default function Home() {
 
       <section className="about-section" id="sobre">
         <div className="about-image-wrap" data-reveal>
-          <Image src="/media/savia-white.webp" alt="Sávia Araújo, maquiadora e criadora da experiência" fill sizes="(max-width: 760px) 100vw, 50vw" />
+          <Image className="managed-media" src={getMedia('home.about').url} alt={getMedia('home.about').alt} fill sizes="(max-width: 760px) 100vw, 50vw" style={managedMediaStyle(getMedia('home.about'))} />
           <div className="about-stamp"><span>+</span><strong>2018</strong><small>beleza com<br />propósito</small></div>
         </div>
         <div className="about-copy" data-reveal>
@@ -394,10 +413,11 @@ export default function Home() {
       <section className="testimonial-section">
         <p className="eyebrow" data-reveal>Manifesto</p>
         <blockquote data-reveal>Não é sobre se tornar outra pessoa.<br /><em>É sobre reconhecer a potência que já existe em você.</em></blockquote>
-        <div className="testimonial-author" data-reveal><Image src="/media/savia-manifesto.jpg" alt="Sávia Araújo" width={42} height={42} /><p><strong>Sávia Araújo</strong><small>Beauty with intention</small></p></div>
+        <div className="testimonial-author" data-reveal><span className="testimonial-avatar"><Image className="managed-media" src={getMedia('home.manifesto').url} alt={getMedia('home.manifesto').alt} fill sizes="42px" style={managedMediaStyle(getMedia('home.manifesto'))} /></span><p><strong>Sávia Araújo</strong><small>Beauty with intention</small></p></div>
       </section>
 
       <section className="closing-cta">
+        <div className="closing-cta-media" aria-hidden="true"><Image className="managed-media" src={getMedia('home.closing').url} alt="" fill sizes="100vw" style={managedMediaStyle(getMedia('home.closing'))} /></div>
         <div data-reveal>
           <p className="eyebrow">Seu momento começa aqui</p>
           <h2>Qual experiência<br /><em>combina com você?</em></h2>

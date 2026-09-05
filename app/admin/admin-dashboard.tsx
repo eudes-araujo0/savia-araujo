@@ -6,12 +6,15 @@ import Link from 'next/link';
 import {
   AlertCircle, ArrowRight, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight,
   CircleDollarSign, Clock3, CreditCard, LayoutDashboard, MessageCircle, ReceiptText,
-  RefreshCw, Search, Sparkles, Users, X, Plus, Ban, Trash2, Download, Pencil,
+  RefreshCw, Search, Sparkles, Users, X, Plus, Ban, Trash2, Download, Pencil, Images,
 } from 'lucide-react';
 import type { Booking, Expense, ScheduleBlock } from '../../db/schema';
 import { BOOKING_TIMES, SERVICE_CATALOG } from '../../lib/service-catalog';
+import { useSiteMedia } from '../../lib/use-site-media';
+import { managedMediaStyle } from '../../lib/site-media';
+import MediaManager from './media-manager';
 
-type View = 'visao-geral' | 'agenda' | 'clientes' | 'clientes-pendentes' | 'financeiro' | 'comprovantes';
+type View = 'visao-geral' | 'agenda' | 'clientes' | 'clientes-pendentes' | 'financeiro' | 'comprovantes' | 'imagens';
 type PaymentAction = 'sync' | 'manual-paid';
 type AdminModal = '' | 'booking' | 'block' | 'expense' | 'edit';
 
@@ -24,9 +27,11 @@ const navigation: { id: View; label: string; icon: typeof LayoutDashboard }[] = 
   { id: 'clientes-pendentes', label: 'Pendências', icon: Clock3 },
   { id: 'financeiro', label: 'Financeiro', icon: CircleDollarSign },
   { id: 'comprovantes', label: 'Pagamentos', icon: ReceiptText },
+  { id: 'imagens', label: 'Imagens do site', icon: Images },
 ];
 
 export default function AdminDashboard({ initialBookings, initialExpenses, initialBlocks, username, signOutPath }: Props) {
+  const getMedia = useSiteMedia();
   const [bookings, setBookings] = useState(initialBookings);
   const [view, setView] = useState<View>('visao-geral');
   const [query, setQuery] = useState('');
@@ -210,7 +215,7 @@ export default function AdminDashboard({ initialBookings, initialExpenses, initi
             return <button key={id} className={view === id ? 'active' : ''} onClick={() => setView(id)}><Icon size={15} /><span>{label}</span>{badge > 0 && <b>{badge}</b>}</button>;
           })}
         </nav>
-        <div className="admin-owner-card"><Image src="/media/savia-admin.jpg" alt="Retrato de Sávia Araújo" fill sizes="240px" /><div><strong>Sávia Araújo</strong><small>Makeup Artist</small></div></div>
+        <div className="admin-owner-card"><Image className="managed-media" src={getMedia('admin.profile').url} alt={getMedia('admin.profile').alt} fill sizes="240px" style={managedMediaStyle(getMedia('admin.profile'))} /><div><strong>Sávia Araújo</strong><small>Makeup Artist</small></div></div>
         <div className="admin-user"><strong>{username}</strong><small>Acesso master</small><a href={signOutPath}>Sair do painel</a></div>
       </aside>
 
@@ -261,6 +266,8 @@ export default function AdminDashboard({ initialBookings, initialExpenses, initi
         {view === 'financeiro' && <><div className="admin-view-actions"><button onClick={() => setModal('expense')}><Plus size={14} /> Registrar despesa</button><a href="/api/admin/export?type=financeiro"><Download size={14} /> Exportar CSV</a></div><div className="finance-summary"><article><small>Recebido</small><strong>{money(financial.received)}</strong><span>sinais, integrais e saldos</span></article><article><small>Despesas</small><strong>{money(financial.spent)}</strong><span>custos registrados</span></article><article><small>Resultado</small><strong>{money(financial.profit)}</strong><span>recebido menos despesas</span></article><article><small>Saldo a receber</small><strong>{money(financial.outstanding)}</strong><span>restante dos atendimentos confirmados</span></article></div><section className="admin-panel admin-full"><div className="panel-head"><div><h2>Entradas nos últimos 7 dias</h2><span>Pagamentos aprovados</span></div></div><div className="revenue-chart tall-chart" aria-label="Entradas dos últimos sete dias">{chart.map((item) => <div className="chart-bar" key={item.date}><strong>{item.value ? money(item.value) : ''}</strong><i style={{ height: `${Math.max(5, item.value / maxChart * 100)}%` }} /><span>{item.label}</span></div>)}</div></section><section className="admin-panel admin-full"><div className="panel-head"><div><h2>Caixa por data do atendimento</h2><span>Receita, saldo, despesas e resultado separados por dia</span></div></div><DayTable groups={dayGroups} onOpenDay={openAgenda} financial /></section><section className="admin-panel admin-full"><div className="panel-head"><div><h2>Despesas</h2><span>Custos lançados por data</span></div><strong>{expenses.length}</strong></div><ExpenseList expenses={expenses} onDelete={(id) => void deleteOperation('expense', id)} /></section><section className="admin-panel admin-full"><div className="panel-head"><div><h2>Movimentação por reserva</h2><span>Sinal, integral e saldo</span></div><span>{paidBookings.length} aprovados</span></div><FinanceTable bookings={paidBookings} onOpen={setSelectedBookingId} /></section></>}
 
         {view === 'comprovantes' && <section className="admin-panel admin-view-panel"><div className="panel-head"><div><h2>Pagamentos e comprovantes</h2><span>Confirmações do checkout e registros manuais</span></div><span>{bookings.length} registros</span></div><div className="payment-list proof-list">{bookings.map((booking) => <article className="payment-row" key={booking.id}><div><strong>{booking.clientName}</strong><small>{booking.id} · {booking.serviceLabel}</small></div><div><small>{booking.paymentOption === 'full' ? 'Integral' : 'Sinal 50%'}</small><strong>{booking.paymentAmountCents ? money(booking.paymentAmountCents) : 'Sob consulta'}</strong></div><span className={`payment-pill ${booking.paymentStatus}`}>{paymentLabel(booking.paymentStatus)}</span><div className="payment-proof">{booking.paymentId && <small>{paymentProviderLabel(booking.paymentProvider)} · {booking.paymentId}</small>}{booking.paymentReceiptUrl && <a className="receipt-link" href={booking.paymentReceiptUrl} target="_blank" rel="noreferrer">Comprovante InfinitePay</a>}{booking.receiptKey && <a className="receipt-link" href={`/api/receipts/${booking.id}`} target="_blank">Abrir comprovante</a>}{!booking.paymentId && !booking.receiptKey && <small>Aguardando pagamento</small>}<button className="details-link" onClick={() => setSelectedBookingId(booking.id)}>Ver reserva <ArrowRight size={11} /></button>{booking.paymentStatus !== 'pago' && <PaymentActions booking={booking} busy={busyPayment === booking.id} onAction={changePayment} />}</div></article>)}{!bookings.length && <div className="empty-state">Nenhum pagamento registrado.</div>}</div></section>}
+
+        {view === 'imagens' && <MediaManager />}
       </section>
       {selectedBooking && <BookingDrawer booking={selectedBooking} busyPayment={busyPayment === selectedBooking.id} onClose={() => setSelectedBookingId('')} onStatusChange={changeStatus} onPaymentAction={changePayment} onEdit={() => setModal('edit')} onReceiveBalance={receiveBalance} />}
       {modal && <OperationModal mode={modal} agendaDate={agendaDate} booking={modal === 'edit' ? selectedBooking : null} busy={operationBusy} onClose={() => setModal('')} onSubmit={submitOperation} />}

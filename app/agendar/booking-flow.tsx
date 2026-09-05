@@ -5,6 +5,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Check, CreditCard, ShieldCheck } from 'lucide-react';
 import { BOOKABLE_SERVICES, BOOKING_TIMES } from '../../lib/service-catalog';
+import { useSiteMedia } from '../../lib/use-site-media';
+import { managedMediaStyle } from '../../lib/site-media';
 
 const services = BOOKABLE_SERVICES;
 const times = BOOKING_TIMES;
@@ -27,6 +29,7 @@ const initialData: BookingData = { service: '', date: '', time: '', name: '', wh
 type Props = { initialService: string; initialPayment: string; initialBooking: string; initialToken: string; initialPaymentId: string; initialTransactionNsu: string; initialSlug: string; initialReceiptUrl: string };
 
 export default function BookingFlow({ initialService, initialPayment, initialBooking, initialToken, initialPaymentId, initialTransactionNsu, initialSlug, initialReceiptUrl }: Props) {
+  const getMedia = useSiteMedia();
   const requestedService = services.some((service) => service.code === initialService) ? initialService : '';
   const requestedGroup = services.find((service) => service.code === requestedService)?.group || 'makeup';
   const returnedFromPayment = Boolean(initialPayment && initialBooking);
@@ -114,7 +117,7 @@ export default function BookingFlow({ initialService, initialPayment, initialBoo
   return (
     <main className="booking-page">
       <aside className="booking-visual">
-        <Image src="/media/bride-getting-ready-bw.jpg" alt="Noiva sorrindo enquanto recebe a maquiagem" fill sizes="(max-width: 760px) 100vw, 42vw" preload />
+        <Image className="managed-media" src={getMedia('booking.cover').url} alt={getMedia('booking.cover').alt} fill sizes="(max-width: 760px) 100vw, 42vw" preload style={managedMediaStyle(getMedia('booking.cover'))} />
         <Link className="brand" href="/">SÁVIA <span>ARAÚJO</span></Link>
         <div className="booking-visual-copy">
           <p className="eyebrow">Atendimento exclusivo</p>
