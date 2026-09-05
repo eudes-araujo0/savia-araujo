@@ -53,7 +53,7 @@ export async function POST(request: Request) {
         if (!slot || !pathname.startsWith(`savia/site-media/${slot.id}/`)) throw new Error('Destino de imagem inválido.');
         return {
           allowedContentTypes: ALLOWED_IMAGE_TYPES,
-          maximumSizeInBytes: 20 * 1024 * 1024,
+          maximumSizeInBytes: 50 * 1024 * 1024,
           addRandomSuffix: true,
           cacheControlMaxAge: 31536000,
           tokenPayload: JSON.stringify({ slotId: slot.id }),

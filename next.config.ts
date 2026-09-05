@@ -4,7 +4,9 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: process.cwd(),
   turbopack: { root: process.cwd() },
   images: {
-    qualities: [75, 95],
+    // Preserve the photographer's original pixels. Site images are served
+    // directly from their source instead of being re-encoded by Next/Vercel.
+    unoptimized: true,
     remotePatterns: [{ protocol: 'https', hostname: '**.public.blob.vercel-storage.com' }],
   },
   async headers() {

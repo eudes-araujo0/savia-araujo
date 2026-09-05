@@ -62,8 +62,8 @@ export default function MediaManager() {
     if (!['image/jpeg', 'image/png', 'image/webp', 'image/avif'].includes(file.type)) {
       setFeedback({ kind: 'error', text: 'Use uma imagem JPG, PNG, WebP ou AVIF.' }); return;
     }
-    if (file.size > 20 * 1024 * 1024) {
-      setFeedback({ kind: 'error', text: 'A imagem deve ter no máximo 20 MB.' }); return;
+    if (file.size > 50 * 1024 * 1024) {
+      setFeedback({ kind: 'error', text: 'A imagem original deve ter no máximo 50 MB.' }); return;
     }
     if (editor.file) URL.revokeObjectURL(editor.previewUrl);
     setEditor({ ...editor, file, previewUrl: URL.createObjectURL(file) });
@@ -83,7 +83,7 @@ export default function MediaManager() {
     setSaving(true); setProgress(0); setFeedback(null);
     const controller = new AbortController();
     uploadAbort.current = controller;
-    const timeout = window.setTimeout(() => controller.abort(), 45000);
+    const timeout = window.setTimeout(() => controller.abort(), editor.file && editor.file.size > 4 * 1024 * 1024 ? 300000 : 45000);
     try {
       let url = urlOverride || editor.item.current.url;
       let pathname = pathnameOverride === undefined ? editor.item.current.pathname : pathnameOverride;
@@ -186,7 +186,7 @@ export default function MediaManager() {
             <p className="media-stage-note">Prévia de enquadramento. O formato exato acompanha o card de cada tela.</p>
           </div>
           <div className="media-editor-controls">
-            <label className="media-upload-button"><ImagePlus size={16} /><span>{editor.file ? editor.file.name : 'Escolher nova foto'}<small>JPG, PNG, WebP ou AVIF · até 20 MB</small></span><input type="file" accept="image/jpeg,image/png,image/webp,image/avif" onChange={(event) => chooseFile(event.target.files?.[0] || null)} /></label>
+            <label className="media-upload-button"><ImagePlus size={16} /><span>{editor.file ? editor.file.name : 'Escolher nova foto'}<small>Original sem compressão · JPG, PNG, WebP ou AVIF · até 50 MB</small></span><input type="file" accept="image/jpeg,image/png,image/webp,image/avif" onChange={(event) => chooseFile(event.target.files?.[0] || null)} /></label>
             <label><span>Descrição acessível</span><input value={editor.alt} maxLength={180} onChange={(event) => setEditor({ ...editor, alt: event.target.value })} /></label>
             <div className="media-control-heading"><strong>Enquadramento · {editor.mode === 'desktop' ? 'computador' : 'celular'}</strong><small>{Math.round(currentX || 0)}% × {Math.round(currentY || 0)}%</small></div>
             <label><span>Posição horizontal</span><input type="range" min="0" max="100" value={currentX} onChange={(event) => setEditor(editor.mode === 'desktop' ? { ...editor, desktopX: Number(event.target.value) } : { ...editor, mobileX: Number(event.target.value) })} /></label>
