@@ -1,16 +1,14 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Check, CreditCard, ShieldCheck } from 'lucide-react';
+import { BOOKABLE_SERVICES, BOOKING_TIMES } from '../../lib/service-catalog';
 
-const services = [
-  { code: 'social', name: 'Maquiagem social', note: 'Eventos, formaturas e celebrações', price: 'R$ 220', priceCents: 22000 },
-  { code: 'noiva', name: 'Experiência noiva', note: 'Teste + produção no grande dia', price: 'R$ 790', priceCents: 79000 },
-  { code: 'editorial', name: 'Editorial & ensaio', note: 'Fotos, conteúdo e campanhas', price: 'Sob consulta', priceCents: 0 },
-];
-
-const times = ['08:00', '09:30', '11:00', '13:30', '15:00', '16:30', '18:00', '19:30'];
+const services = BOOKABLE_SERVICES;
+const times = BOOKING_TIMES;
+const serviceGroups = ['makeup', 'noivas', 'boss'] as const;
 
 type BookingData = {
   service: string;
@@ -59,7 +57,7 @@ export default function BookingFlow({ initialService, initialPayment, initialBoo
   useEffect(() => {
     if (!data.date) return;
     let active = true;
-    fetch(`/api/bookings/availability?date=${encodeURIComponent(data.date)}`)
+    fetch(`/api/bookings/availability?date=${encodeURIComponent(data.date)}&service=${encodeURIComponent(data.service)}`)
       .then((response) => response.ok ? response.json() : { unavailable: [] })
       .then((result: { unavailable?: string[] }) => {
         if (!active) return;
@@ -68,7 +66,7 @@ export default function BookingFlow({ initialService, initialPayment, initialBoo
         setData((current) => unavailable.includes(current.time) ? { ...current, time: '' } : current);
       });
     return () => { active = false; };
-  }, [data.date]);
+  }, [data.date, data.service]);
 
   const selectedService = useMemo(() => services.find((service) => service.code === data.service), [data.service]);
   const today = new Date().toISOString().slice(0, 10);
@@ -108,7 +106,7 @@ export default function BookingFlow({ initialService, initialPayment, initialBoo
   return (
     <main className="booking-page">
       <aside className="booking-visual">
-        <img src="/media/bride-getting-ready-bw.jpg" alt="Noiva sorrindo enquanto recebe a maquiagem" />
+        <Image src="/media/bride-getting-ready-bw.jpg" alt="Noiva sorrindo enquanto recebe a maquiagem" fill sizes="(max-width: 760px) 100vw, 42vw" preload />
         <Link className="brand" href="/">SÁVIA <span>ARAÚJO</span></Link>
         <div className="booking-visual-copy">
           <p className="eyebrow">Atendimento exclusivo</p>
@@ -130,13 +128,21 @@ export default function BookingFlow({ initialService, initialPayment, initialBoo
             <div>
               <span className="booking-step-label">Etapa 01 · Experiência</span>
               <h2>Como você quer<br />se sentir?</h2>
-              <div className="service-options">
-                {services.map((service) => (
-                  <button type="button" key={service.code} className={`service-option ${data.service === service.code ? 'selected' : ''}`} onClick={() => setData({ ...data, service: service.code })} aria-pressed={data.service === service.code}>
-                    <div><h3>{service.name}</h3><p>{service.note}</p></div>
-                    <strong>{service.price}</strong>
-                  </button>
-                ))}
+              <div className="service-groups">
+                {serviceGroups.map((group) => {
+                  const groupedServices = services.filter((service) => service.group === group);
+                  return <section className="booking-service-group" key={group}>
+                    <p className="service-group-title">{groupedServices[0].groupLabel}</p>
+                    <div className="service-options">
+                      {groupedServices.map((service) => (
+                        <button type="button" key={service.code} className={`service-option ${data.service === service.code ? 'selected' : ''}`} onClick={() => setData({ ...data, service: service.code, date: '', time: '' })} aria-pressed={data.service === service.code}>
+                          <div><h3>{service.name}</h3><p>{service.note}</p></div>
+                          <strong>{money(service.priceCents)}</strong>
+                        </button>
+                      ))}
+                    </div>
+                  </section>;
+                })}
               </div>
             </div>
           )}
@@ -145,6 +151,8 @@ export default function BookingFlow({ initialService, initialPayment, initialBoo
             <div>
               <span className="booking-step-label">Etapa 02 · Agenda</span>
               <h2>Quando será<br />o seu momento?</h2>
+              {selectedService?.group === 'noivas' && <p className="availability-note">O Dia da Noiva é exclusivo: ao confirmar, a data fica reservada para você e sua família.</p>}
+              {selectedService?.group === 'boss' && <p className="availability-note">O Pacote Boss acontece em estúdio e dura, em média, de 2 a 3 horas.</p>}
               <div className="form-grid">
                 <div className="form-field full">
                   <label htmlFor="date">Data desejada</label>

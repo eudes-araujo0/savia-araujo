@@ -1,6 +1,7 @@
 import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 import type { Booking } from './schema';
 import { decryptSensitive, encryptSensitive } from '../lib/data-crypto';
+import { BOOKING_TIMES, isBridalService } from '../lib/service-catalog';
 
 let client: NeonQueryFunction<false, false> | null = null;
 let initialized: Promise<void> | null = null;
@@ -132,11 +133,29 @@ export async function getBooking(id: string): Promise<Booking | null> {
   return rows[0] ? await mapBooking(rows[0] as Record<string, unknown>) : null;
 }
 
-export async function listUnavailableTimes(appointmentDate: string): Promise<string[]> {
+export async function listUnavailableTimes(appointmentDate: string, requestedService = ''): Promise<string[]> {
   await ensureBookingsSchema();
   const sql = database();
-  const rows = await sql`SELECT appointment_time FROM bookings WHERE appointment_date = ${appointmentDate} AND status != 'cancelado'`;
+  const rows = await sql`SELECT appointment_time, service FROM bookings WHERE appointment_date = ${appointmentDate} AND status != 'cancelado'`;
+  if ((isBridalService(requestedService) && rows.length > 0) || rows.some((row) => isBridalService(String(row.service)))) {
+    return BOOKING_TIMES;
+  }
   return rows.map((row) => String(row.appointment_time));
+}
+
+export async function assertBookingAvailability(appointmentDate: string, appointmentTime: string, requestedService: string) {
+  await ensureBookingsSchema();
+  const sql = database();
+  const rows = await sql`SELECT appointment_time, service FROM bookings WHERE appointment_date = ${appointmentDate} AND status != 'cancelado'`;
+  if (isBridalService(requestedService) && rows.length > 0) {
+    throw new Error('Esta data não está disponível para o Dia da Noiva, pois a experiência é exclusiva.');
+  }
+  if (rows.some((row) => isBridalService(String(row.service)))) {
+    throw new Error('Esta data está reservada com exclusividade para uma noiva.');
+  }
+  if (rows.some((row) => String(row.appointment_time) === appointmentTime)) {
+    throw new Error('Este horário está indisponível. Escolha outro horário.');
+  }
 }
 
 export async function updatePaymentPreference(id: string, provider: string, preferenceId: string | null, paymentUrl: string | null) {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { CalendarDays, CircleDollarSign, Clock3, LayoutDashboard, ReceiptText, RefreshCw, Search, Sparkles, Users } from 'lucide-react';
 import type { Booking } from '../../db/schema';
@@ -142,7 +143,7 @@ export default function AdminDashboard({ initialBookings, username, signOutPath 
           ))}
         </nav>
         <div className="admin-owner-card">
-          <img src="/media/savia-admin.jpg" alt="Retrato de Sávia Araújo" />
+          <Image src="/media/savia-admin.jpg" alt="Retrato de Sávia Araújo" fill sizes="240px" />
           <div><strong>Sávia Araújo</strong><small>Makeup Artist</small></div>
         </div>
         <div className="admin-user"><strong>{username}</strong><small>Administradora</small><a href={signOutPath}>Sair do painel</a></div>
@@ -211,7 +212,7 @@ export default function AdminDashboard({ initialBookings, username, signOutPath 
             <article><small>Saldo a receber</small><strong>{money(financial.outstanding)}</strong><span>restante dos sinais já pagos</span></article>
           </div>
           <section className="admin-panel admin-full">
-            <div className="panel-head"><h2>Entradas nos últimos 7 dias</h2><span>sinais aprovados</span></div>
+            <div className="panel-head"><h2>Entradas nos últimos 7 dias</h2><span>pagamentos aprovados</span></div>
             <div className="revenue-chart tall-chart" aria-label="Entradas dos últimos sete dias">
               {chart.map((item) => <div className="chart-bar" key={item.date}><strong>{item.value ? money(item.value) : ''}</strong><i style={{ height: `${Math.max(5, item.value / maxChart * 100)}%` }} /><span>{item.label}</span></div>)}
             </div>
@@ -312,4 +313,4 @@ function todayInSaoPaulo() { return new Intl.DateTimeFormat('en-CA', { timeZone:
 function todayFromTimestamp(timestamp: number) { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(timestamp)); }
 function longDate(value: string) { return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full', timeZone: 'UTC' }).format(new Date(`${value}T12:00:00Z`)); }
 function initials(value: string) { return value.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase(); }
-function paymentLabel(status: string) { return ({ pago: 'Sinal pago', em_analise: 'Em análise', aguardando: 'Aguardando', rejeitado: 'Recusado', cancelado: 'Cancelado', estornado: 'Estornado', nao_aplicavel: 'Sob consulta', configuracao_pendente: 'Pagamento indisponível' } as Record<string, string>)[status] || status.replaceAll('_', ' '); }
+function paymentLabel(status: string) { return ({ pago: 'Pago', em_analise: 'Em análise', aguardando: 'Aguardando', rejeitado: 'Recusado', cancelado: 'Cancelado', estornado: 'Estornado', nao_aplicavel: 'Sob consulta', configuracao_pendente: 'Pagamento indisponível' } as Record<string, string>)[status] || status.replaceAll('_', ' '); }

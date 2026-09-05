@@ -1,11 +1,13 @@
-# Sávia Araújo Makeup — Vercel + Neon
+# Sávia Araújo — Makeup, Noivas & Fotografia
 
-Projeto completo em Next.js para publicar na Vercel, com banco PostgreSQL da Neon, painel administrativo protegido e integração de sinal de 50% pelo Mercado Pago.
+Projeto completo em Next.js para publicar na Vercel, com serviços de maquiagem, Dia da Noiva e Pacote Boss, banco PostgreSQL da Neon, painel administrativo protegido e Mercado Pago.
 
 ## O que já funciona
 
 - site e portfólio responsivos;
+- catálogo com Make Express, Make Social, Make & Hair, três experiências de noiva e três versões do Pacote Boss;
 - agendamento com bloqueio de horários já reservados;
+- reserva exclusiva da data para os pacotes de noiva;
 - escolha entre sinal de 50% ou pagamento integral;
 - checkout do Mercado Pago e confirmação por webhook;
 - modo de demonstração sem cobrança real;
@@ -56,7 +58,11 @@ Cadastre estas variáveis em **Vercel > Project > Settings > Environment Variabl
 Nunca publique o arquivo `.env.local` nem coloque senhas ou chaves diretamente no código. Para gerar os segredos no PowerShell:
 
 ```powershell
-[Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+$bytes = New-Object byte[] 32
+$rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+$rng.GetBytes($bytes)
+[Convert]::ToBase64String($bytes)
+$rng.Dispose()
 ```
 
 Para gerar o hash da senha sem gravar a senha no histórico do terminal:

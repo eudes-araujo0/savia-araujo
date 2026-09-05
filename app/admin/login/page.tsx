@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { getAdminSession } from '../../../lib/admin-auth';
@@ -16,7 +17,7 @@ export default async function AdminLoginPage() {
   return (
     <main className="admin-login-page">
       <section className="admin-login-visual">
-        <img src="/media/savia-admin.jpg" alt="Sávia Araújo" />
+        <Image src="/media/savia-admin.jpg" alt="Sávia Araújo" fill sizes="(max-width: 760px) 100vw, 45vw" preload />
         <Link className="brand" href="/">SÁVIA <span>ARAÚJO</span></Link>
         <div><p className="eyebrow">Área reservada</p><h1>Gestão com<br /><em>elegância.</em></h1></div>
       </section>

@@ -1,17 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getAdminSession } from '../../../lib/admin-auth';
 import { createPaymentCheckout } from '../../../lib/mercado-pago';
-import { createBooking, listBookings, updateBookingStatus, updatePaymentPreference } from '../../../db/bookings';
+import { assertBookingAvailability, createBooking, listBookings, updateBookingStatus, updatePaymentPreference } from '../../../db/bookings';
 import type { Booking } from '../../../db/schema';
 import { isSameOriginRequest } from '../../../lib/request-security';
+import { BOOKING_TIMES, SERVICE_CATALOG } from '../../../lib/service-catalog';
 
-const allowedTimes = new Set(['08:00', '09:30', '11:00', '13:30', '15:00', '16:30', '18:00', '19:30']);
-
-const serviceCatalog: Record<string, { label: string; priceCents: number }> = {
-  social: { label: 'Maquiagem social', priceCents: 22000 },
-  noiva: { label: 'Experiência noiva', priceCents: 79000 },
-  editorial: { label: 'Editorial & ensaio', priceCents: 0 },
-};
+const allowedTimes = new Set(BOOKING_TIMES);
 
 export async function POST(request: Request) {
   if (!isSameOriginRequest(request)) return NextResponse.json({ error: 'Origem não autorizada.' }, { status: 403 });
@@ -31,7 +26,7 @@ export async function POST(request: Request) {
     const notes = text(form, 'notes');
     const appointmentDate = text(form, 'date');
     const appointmentTime = text(form, 'time');
-    const catalogItem = serviceCatalog[service];
+    const catalogItem = SERVICE_CATALOG[service];
 
     if (!catalogItem || !clientName || !whatsapp || !appointmentDate || !appointmentTime) {
       return NextResponse.json({ error: 'Preencha os dados obrigatórios do agendamento.' }, { status: 400 });
@@ -81,9 +76,11 @@ export async function POST(request: Request) {
     };
 
     try {
+      await assertBookingAvailability(appointmentDate, appointmentTime, service);
       await createBooking(booking);
     } catch (databaseError) {
       const message = databaseError instanceof Error ? databaseError.message : '';
+      if (/exclusiv|indisponível/i.test(message)) return NextResponse.json({ error: message }, { status: 409 });
       if (/unique|constraint/i.test(message)) return NextResponse.json({ error: 'Este horário acabou de ser reservado. Escolha outro horário.' }, { status: 409 });
       throw databaseError;
     }
