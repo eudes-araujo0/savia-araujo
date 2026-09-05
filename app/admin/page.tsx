@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import { listBookings } from '../../db/bookings';
+import { listBookings, listExpenses, listScheduleBlocks } from '../../db/bookings';
 import { requireAdminSession } from '../../lib/admin-auth';
 import AdminDashboard from './admin-dashboard';
 
@@ -12,11 +12,13 @@ export const metadata: Metadata = {
 
 export default async function AdminPage() {
   const session = await requireAdminSession('/admin');
-  const bookings = await listBookings();
+  const [bookings, expenses, blocks] = await Promise.all([listBookings(), listExpenses(), listScheduleBlocks()]);
 
   return (
     <AdminDashboard
       initialBookings={bookings}
+      initialExpenses={expenses}
+      initialBlocks={blocks}
       username={session.username}
       signOutPath="/api/admin/session"
     />

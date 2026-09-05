@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getBooking, updatePaymentResult } from '../../../../db/bookings';
 import { fetchMercadoPagoPayment, verifyMercadoPagoWebhook } from '../../../../lib/mercado-pago';
+import { notifyBooking } from '../../../../lib/notifications';
 
 export async function POST(request: Request) {
   try {
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
       paidAt: approved ? Date.parse(payment.date_approved || new Date().toISOString()) : null,
       confirmBooking: approved,
     });
+    if (approved && booking.paymentStatus !== 'pago') await notifyBooking({ ...booking, paymentStatus: 'pago', status: 'confirmado' }, 'payment_approved').catch((notificationError) => console.error('payment-notification-failed', notificationError));
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error('mercado-pago-webhook-failed', error);

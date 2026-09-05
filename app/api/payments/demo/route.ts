@@ -3,6 +3,7 @@ import { getBooking, updatePaymentResult } from '../../../../db/bookings';
 import { verifyDemoToken } from '../../../../lib/mercado-pago';
 import { runtimeFlag } from '../../../../lib/runtime-env';
 import { isSameOriginRequest } from '../../../../lib/request-security';
+import { notifyBooking } from '../../../../lib/notifications';
 
 export async function POST(request: Request) {
   if (!isSameOriginRequest(request)) return NextResponse.json({ error: 'Origem não autorizada.' }, { status: 403 });
@@ -23,5 +24,6 @@ export async function POST(request: Request) {
     paidAt: Date.now(),
     confirmBooking: true,
   });
+  if (booking.paymentStatus !== 'pago') await notifyBooking({ ...booking, paymentStatus: 'pago', status: 'confirmado' }, 'payment_approved').catch(() => undefined);
   return NextResponse.json({ ok: true });
 }

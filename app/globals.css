@@ -271,6 +271,10 @@ footer > small { justify-self: end; color: rgba(243,237,226,.34); font-size: 8px
 .booking-selection-summary small, .booking-selection-summary strong { display: block; }
 .booking-selection-summary small { color: #9a743a; font-size: 7px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
 .booking-selection-summary strong { margin-top: 5px; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.booking-consent { display: flex; align-items: flex-start; gap: 11px; margin-top: 4px; color: rgba(10,10,9,.68); font-size: 12px; line-height: 1.6; }
+.booking-consent input { width: 17px; height: 17px; flex: 0 0 auto; margin-top: 1px; accent-color: #a67b3c; }
+.booking-consent a { color: #805b26; text-decoration: underline; text-underline-offset: 3px; }
+.button-outline { border: 1px solid rgba(10,10,9,.28); background: transparent; color: var(--ink); }
 
 /* Admin */
 .admin-page { min-height: 100svh; display: grid; grid-template-columns: 240px 1fr; background: #f1eee8; color: #191713; }
@@ -649,6 +653,122 @@ footer > small { justify-self: end; color: rgba(243,237,226,.34); font-size: 8px
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+/* Agenda, financeiro e gestão de reservas */
+.admin-create, .admin-view-actions button, .admin-view-actions a { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid #b88d48; background: #17130f; color: #f7f1e7; padding: 11px 14px; font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; text-decoration: none; }
+.admin-view-actions { display: flex; justify-content: flex-end; gap: 9px; margin: 18px 0 0; }
+.admin-view-actions button:nth-child(2) { background: #f8f5ef; color: #332a20; border-color: #d7cec1; }
+.day-blocks { margin-top: 14px; border: 1px solid #d6c8b5; background: #f4ede3; padding: 14px 17px; }
+.day-blocks > div { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; color: #765221; }
+.day-blocks article { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #ded3c4; padding: 9px 0; font-size: 12px; }
+.day-blocks article button, .expense-list article button { display: grid; place-items: center; width: 30px; height: 30px; border: 1px solid #d7cec1; background: white; color: #8e453d; cursor: pointer; }
+.positive-value { color: #39644e; font-weight: 800; }
+.negative-value { color: #9c4c44; }
+.day-table td:first-child { min-width: 105px; text-transform: capitalize; }
+.day-overview { margin-top: 18px; }
+.expense-list { padding: 0 21px 18px; }
+.expense-list article { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 17px; padding: 14px 0; border-bottom: 1px solid #ebe5db; }
+.expense-list article div strong, .expense-list article div small { display: block; }
+.expense-list article div strong { font-size: 13px; }
+.expense-list article div small { margin-top: 4px; color: #8b8173; font-size: 10px; }
+.expense-list article > b { color: #8e453d; font-family: var(--font-display), serif; font-size: 17px; }
+.drawer-top-actions { display: grid; grid-template-columns: 1fr auto; gap: 9px; margin: 15px 30px 0; }
+.drawer-top-actions .drawer-whatsapp { margin: 0; }
+.drawer-top-actions > button { display: inline-flex; align-items: center; gap: 7px; border: 1px solid #d7cec1; background: white; padding: 0 13px; color: #544a3e; font-size: 9px; font-weight: 800; text-transform: uppercase; cursor: pointer; }
+.balance-form { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 8px; margin-top: 15px; }
+.balance-form label { color: #7e715f; font-size: 9px; font-weight: 700; text-transform: uppercase; }
+.balance-form input { display: block; width: 100%; margin-top: 6px; border: 1px solid #d7cec1; padding: 10px; font-size: 13px; }
+.balance-form button { border: 1px solid #b88d48; background: #211a14; color: white; padding: 11px 13px; cursor: pointer; }
+
+.operation-modal-backdrop { position: fixed; z-index: 120; inset: 0; display: grid; place-items: center; padding: 20px; background: rgba(13,10,7,.66); backdrop-filter: blur(7px); }
+.operation-modal { width: min(620px, 100%); max-height: min(820px, calc(100vh - 40px)); overflow: auto; border: 1px solid rgba(205,167,93,.55); background: #f8f5ef; box-shadow: 0 30px 100px rgba(0,0,0,.32); }
+.operation-modal > header { display: flex; align-items: center; justify-content: space-between; padding: 24px 28px; background: #17130f; color: white; }
+.operation-modal h2 { margin-top: 4px; font-family: var(--font-display), serif; font-size: 30px; font-weight: 500; }
+.operation-modal > header > button { display: grid; place-items: center; width: 35px; height: 35px; border: 1px solid rgba(255,255,255,.22); background: transparent; color: white; cursor: pointer; }
+.operation-modal form { display: grid; gap: 15px; padding: 25px 28px 28px; }
+.operation-modal label { display: grid; gap: 7px; color: #74695b; font-size: 9px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+.operation-modal input, .operation-modal select, .operation-modal textarea { width: 100%; border: 1px solid #d5cec4; border-radius: 0; background: white; padding: 12px; color: #241f19; font: 13px var(--font-body), sans-serif; text-transform: none; }
+.operation-modal textarea { resize: vertical; }
+.operation-modal .modal-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 13px; }
+.operation-modal .modal-check { display: flex; align-items: center; grid-template-columns: auto 1fr; gap: 9px; }
+.operation-modal .modal-check input { width: 17px; height: 17px; accent-color: #a87835; }
+.operation-modal form > footer { display: flex; justify-content: flex-end; gap: 9px; margin-top: 5px; padding: 16px 0 0; border-top: 1px solid #ded6cb; }
+.operation-modal form > footer button { border: 1px solid #d5cec4; background: white; padding: 12px 18px; color: #453c32; font-size: 9px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; cursor: pointer; }
+.operation-modal form > footer .primary { border-color: #b88d48; background: #17130f; color: white; }
+
+/* Área segura da cliente */
+.manage-page, .legal-page { min-height: 100vh; background: #f3eee6; color: #191612; }
+.manage-page > nav, .legal-page > nav { display: flex; align-items: center; justify-content: space-between; min-height: 76px; padding: 0 clamp(20px,5vw,72px); border-bottom: 1px solid #d9d1c6; }
+.manage-page > nav > a:last-child, .legal-page > nav > a:last-child { display: inline-flex; align-items: center; gap: 7px; color: #574c3f; font-size: 11px; font-weight: 700; text-decoration: none; }
+.manage-shell { width: min(1120px, calc(100% - 40px)); margin: 0 auto; padding: 70px 0 90px; }
+.manage-shell > header { display: grid; grid-template-columns: 1fr auto; align-items: end; gap: 30px; padding-bottom: 30px; border-bottom: 1px solid #d3c9bb; }
+.manage-shell > header h1 { margin: 7px 0; font: 500 clamp(46px,6vw,76px)/.95 var(--font-display), serif; }
+.manage-shell > header p:last-child { color: #75695b; font-size: 13px; }
+.manage-status { display: inline-flex; align-items: center; gap: 7px; border: 1px solid #cbbda9; padding: 11px 14px; color: #7d6034; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.manage-status.paid { border-color: #9db8a7; color: #39644e; background: #edf4ef; }
+.manage-status.expired, .manage-status.cancelled { border-color: #d7aaa4; color: #8e453d; background: #f8ecea; }
+.manage-feedback { margin: 18px 0 0; padding: 13px 15px; border: 1px solid; font-size: 12px; }
+.manage-feedback.success { border-color: #9db8a7; background: #edf4ef; color: #315b45; }
+.manage-feedback.error { border-color: #d7aaa4; background: #f8ecea; color: #873e37; }
+.manage-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 24px; }
+.manage-card, .manage-support { border: 1px solid #d8d0c5; background: #fbfaf7; padding: 27px; }
+.manage-card-title { display: flex; align-items: center; gap: 9px; margin-bottom: 22px; color: #a37636; }
+.manage-card-title h2, .manage-support h2 { font: 500 25px var(--font-display), serif; color: #211c17; }
+.manage-card > strong { font: 500 27px var(--font-display), serif; }
+.manage-card dl { display: grid; grid-template-columns: repeat(3,1fr); margin-top: 22px; }
+.manage-card dl div { border-right: 1px solid #dfd7cc; padding-right: 12px; }
+.manage-card dt, .manage-money small { color: #8b7e6d; font-size: 8px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.manage-card dd { margin: 5px 0 0; font-size: 12px; }
+.manage-money { display: grid; grid-template-columns: repeat(3,1fr); gap: 1px; margin-bottom: 20px; background: #ded6cb; }
+.manage-money div { background: #f5f1ea; padding: 13px; }
+.manage-money strong, .manage-money small { display: block; }
+.manage-money strong { margin-top: 5px; font: 500 19px var(--font-display), serif; }
+.manage-small { display: flex; align-items: center; gap: 6px; margin-top: 13px; color: #827668; font-size: 10px; }
+.manage-reschedule { grid-column: 1 / -1; }
+.manage-reschedule > p, .manage-support p { color: #74695c; font-size: 12px; line-height: 1.65; }
+.manage-reschedule label { display: grid; gap: 7px; margin-top: 18px; color: #74695c; font-size: 9px; font-weight: 800; text-transform: uppercase; }
+.manage-reschedule input { width: min(260px,100%); border: 1px solid #d6cdc1; background: white; padding: 11px; }
+.manage-times { display: flex; flex-wrap: wrap; gap: 7px; margin: 15px 0; }
+.manage-times button { border: 1px solid #d6cdc1; background: white; padding: 9px 12px; cursor: pointer; }
+.manage-times button.active { border-color: #a97936; background: #211a14; color: white; }
+.manage-times button:disabled { opacity: .35; cursor: not-allowed; }
+.manage-support { background: #201a14; color: white; }
+.manage-support h2 { margin: 11px 0 5px; color: white; }
+.manage-support p { color: #c6b9a8; }
+.manage-support a { display: inline-block; margin-top: 15px; color: #e0b869; font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.manage-cancel { margin-top: 24px; border: 0; background: transparent; color: #8f4a42; font-size: 10px; text-decoration: underline; cursor: pointer; }
+.manage-legal { margin-top: 14px; color: #817568; font-size: 10px; }
+.manage-legal a { color: inherit; }
+
+.legal-page article { width: min(820px, calc(100% - 40px)); margin: 0 auto; padding: 80px 0 100px; }
+.legal-page h1 { margin: 12px 0 20px; font: 500 clamp(50px,7vw,82px)/.9 var(--font-display), serif; }
+.legal-page h1 em { color: #b5863d; font-weight: 400; }
+.legal-intro { color: #706457; font-size: 15px; }
+.legal-page article section { padding: 25px 0; border-top: 1px solid #d9d0c4; }
+.legal-page article section:first-of-type { margin-top: 45px; }
+.legal-page article section h2 { margin-bottom: 8px; font: 500 25px var(--font-display), serif; }
+.legal-page article section p { color: #6f6457; font-size: 13px; line-height: 1.75; }
+.legal-page article section a, .legal-page article footer a { color: #8f652b; }
+.legal-page article footer { display: flex; justify-content: space-between; gap: 15px; padding: 25px 0 0; color: #8b8073; font-size: 10px; }
+
+@media (max-width: 760px) {
+  .admin-header-actions .admin-create { display: none; }
+  .admin-view-actions { justify-content: stretch; }
+  .admin-view-actions > * { flex: 1; }
+  .operation-modal { max-height: calc(100vh - 20px); }
+  .operation-modal > header, .operation-modal form { padding-right: 20px; padding-left: 20px; }
+  .operation-modal .modal-grid { grid-template-columns: 1fr; }
+  .drawer-top-actions { grid-template-columns: 1fr; margin-inline: 22px; }
+  .drawer-top-actions > button { min-height: 42px; justify-content: center; }
+  .manage-shell { width: min(100% - 28px, 1120px); padding-top: 42px; }
+  .manage-shell > header, .manage-grid { grid-template-columns: 1fr; }
+  .manage-status { justify-self: start; }
+  .manage-card, .manage-support { padding: 22px; }
+  .manage-card dl, .manage-money { grid-template-columns: 1fr; gap: 8px; }
+  .manage-card dl div { border-right: 0; border-bottom: 1px solid #dfd7cc; padding: 9px 0; }
+  .legal-page article { padding-top: 55px; }
+  .legal-page article footer { flex-direction: column; }
 }
 
 @media (max-width: 1180px) {

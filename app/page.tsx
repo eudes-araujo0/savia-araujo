@@ -411,7 +411,7 @@ export default function Home() {
       <footer>
         <a className="brand" href="#inicio">SÁVIA <span>ARAÚJO</span></a>
         <p>Makeup artist · Pernambuco & região</p>
-        <div><a href="https://instagram.com/makeup.saviaraujo" target="_blank" rel="noreferrer">Instagram</a><a href="https://wa.me/5581981747620" target="_blank" rel="noreferrer">WhatsApp</a><a href="/agendar">Agendamento</a><a href="/admin">Área administrativa</a></div>
+        <div><a href="https://instagram.com/makeup.saviaraujo" target="_blank" rel="noreferrer">Instagram</a><a href="https://wa.me/5581981747620" target="_blank" rel="noreferrer">WhatsApp</a><a href="/agendar">Agendamento</a><a href="/privacidade">Privacidade</a><a href="/termos">Termos</a><a href="/admin">Área administrativa</a></div>
         <small>© 2026 Sávia Araújo. Todos os direitos reservados.</small>
       </footer>
     </main>

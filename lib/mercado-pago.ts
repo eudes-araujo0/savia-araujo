@@ -1,7 +1,8 @@
 import type { Booking } from '../db/schema';
 import { runtimeFlag, runtimeValue } from './runtime-env';
+import { createInfinitePayCheckout, infinitePayHandle } from './infinitepay';
 
-export type PaymentMode = 'mercado_pago' | 'demo' | 'unavailable';
+export type PaymentMode = 'infinitepay' | 'mercado_pago' | 'demo' | 'unavailable';
 
 export type MercadoPagoPayment = {
   id?: number | string;
@@ -15,22 +16,31 @@ export type MercadoPagoPayment = {
 
 export function getPaymentMode(): PaymentMode {
   if (runtimeFlag('PAYMENTS_DEMO_MODE')) return 'demo';
+  const preferred = runtimeValue('PAYMENT_PROVIDER').toLowerCase();
+  if (preferred === 'infinitepay') return infinitePayHandle() ? 'infinitepay' : 'unavailable';
+  if (preferred === 'mercado_pago') return runtimeValue('MERCADO_PAGO_ACCESS_TOKEN') ? 'mercado_pago' : 'unavailable';
+  if (infinitePayHandle()) return 'infinitepay';
   return runtimeValue('MERCADO_PAGO_ACCESS_TOKEN') ? 'mercado_pago' : 'unavailable';
 }
 
-export async function createPaymentCheckout(booking: Booking, origin: string) {
+export async function createPaymentCheckout(booking: Booking, origin: string, managementToken = '') {
   const mode = getPaymentMode();
   if (mode === 'demo') {
     const token = await createDemoToken(booking.id);
     return {
       mode,
       preferenceId: `DEMO-${booking.id}`,
-      paymentUrl: `${origin}/agendar/pagamento-demo?booking=${encodeURIComponent(booking.id)}&token=${encodeURIComponent(token)}`,
+      paymentUrl: `${origin}/agendar/pagamento-demo?booking=${encodeURIComponent(booking.id)}&token=${encodeURIComponent(token)}${managementToken ? `&manage=${encodeURIComponent(managementToken)}` : ''}`,
     };
   }
   if (mode === 'unavailable') return { mode, preferenceId: null, paymentUrl: null };
+  if (mode === 'infinitepay') {
+    const checkout = await createInfinitePayCheckout(booking, origin);
+    return { mode, ...checkout };
+  }
 
   const accessToken = runtimeValue('MERCADO_PAGO_ACCESS_TOKEN');
+  const expirationDate = new Date(booking.expiresAt || Date.now() + 30 * 60 * 1000).toISOString();
   const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
     method: 'POST',
     headers: {
@@ -56,6 +66,8 @@ export async function createPaymentCheckout(booking: Booking, origin: string) {
         failure: `${origin}/agendar?payment=failure&booking=${encodeURIComponent(booking.id)}`,
       },
       auto_return: 'approved',
+      expires: true,
+      expiration_date_to: expirationDate,
       statement_descriptor: 'SAVIA MAKEUP',
     }),
   });

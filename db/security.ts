@@ -2,6 +2,8 @@ import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
+const BOOKING_WINDOW_MS = 60 * 60 * 1000;
+const MAX_BOOKING_ATTEMPTS = 12;
 let client: NeonQueryFunction<false, false> | null = null;
 let initialized: Promise<void> | null = null;
 
@@ -22,13 +24,25 @@ async function ensureSecuritySchema() {
       window_started BIGINT NOT NULL,
       blocked_until BIGINT NOT NULL DEFAULT 0
     )`;
+    await sql`CREATE TABLE IF NOT EXISTS booking_attempts (
+      key_hash TEXT PRIMARY KEY,
+      attempts INTEGER NOT NULL,
+      window_started BIGINT NOT NULL,
+      blocked_until BIGINT NOT NULL DEFAULT 0
+    )`;
     await sql`ALTER TABLE login_attempts ENABLE ROW LEVEL SECURITY`;
     await sql`ALTER TABLE login_attempts FORCE ROW LEVEL SECURITY`;
     await sql`REVOKE ALL ON login_attempts FROM PUBLIC`;
+    await sql`ALTER TABLE booking_attempts ENABLE ROW LEVEL SECURITY`;
+    await sql`ALTER TABLE booking_attempts FORCE ROW LEVEL SECURITY`;
+    await sql`REVOKE ALL ON booking_attempts FROM PUBLIC`;
     await sql`DO $$
       BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = current_schema() AND tablename = 'login_attempts' AND policyname = 'login_attempts_backend_only') THEN
           CREATE POLICY login_attempts_backend_only ON login_attempts TO CURRENT_USER USING (true) WITH CHECK (true);
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = current_schema() AND tablename = 'booking_attempts' AND policyname = 'booking_attempts_backend_only') THEN
+          CREATE POLICY booking_attempts_backend_only ON booking_attempts TO CURRENT_USER USING (true) WITH CHECK (true);
         END IF;
       END
     $$`;
@@ -66,4 +80,30 @@ export async function recordFailedLogin(keyHash: string) {
 export async function clearFailedLogins(keyHash: string) {
   await ensureSecuritySchema();
   await database()`DELETE FROM login_attempts WHERE key_hash = ${keyHash}`;
+}
+
+export async function checkBookingRateLimit(keyHash: string) {
+  await ensureSecuritySchema();
+  const now = Date.now();
+  const rows = await database()`SELECT attempts, window_started, blocked_until FROM booking_attempts WHERE key_hash = ${keyHash} LIMIT 1`;
+  const row = rows[0];
+  if (!row) return { allowed: true, retryAfter: 0 };
+  const blockedUntil = Number(row.blocked_until || 0);
+  if (blockedUntil > now) return { allowed: false, retryAfter: Math.ceil((blockedUntil - now) / 1000) };
+  if (Number(row.window_started) + BOOKING_WINDOW_MS <= now) return { allowed: true, retryAfter: 0 };
+  return { allowed: Number(row.attempts) < MAX_BOOKING_ATTEMPTS, retryAfter: Math.ceil((Number(row.window_started) + BOOKING_WINDOW_MS - now) / 1000) };
+}
+
+export async function recordBookingAttempt(keyHash: string) {
+  await ensureSecuritySchema();
+  const now = Date.now();
+  const rows = await database()`SELECT attempts, window_started FROM booking_attempts WHERE key_hash = ${keyHash} LIMIT 1`;
+  const row = rows[0];
+  const reset = !row || Number(row.window_started) + BOOKING_WINDOW_MS <= now;
+  const attempts = reset ? 1 : Number(row.attempts) + 1;
+  const windowStarted = reset ? now : Number(row.window_started);
+  const blockedUntil = attempts >= MAX_BOOKING_ATTEMPTS ? now + BOOKING_WINDOW_MS : 0;
+  await database()`INSERT INTO booking_attempts (key_hash, attempts, window_started, blocked_until)
+    VALUES (${keyHash}, ${attempts}, ${windowStarted}, ${blockedUntil})
+    ON CONFLICT (key_hash) DO UPDATE SET attempts = EXCLUDED.attempts, window_started = EXCLUDED.window_started, blocked_until = EXCLUDED.blocked_until`;
 }
