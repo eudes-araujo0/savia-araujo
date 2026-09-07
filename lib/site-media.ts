@@ -37,7 +37,8 @@ export type SiteMediaLibraryItem = SiteMediaSlot & {
 };
 
 export const SITE_MEDIA_SLOTS: SiteMediaSlot[] = [
-  slot('home.hero', 'Página inicial', 'Capa principal', 'Primeira imagem vista ao abrir o site.', '/media/boss-gold-portrait.webp', 'Retrato de beleza com maquiagem iluminada e produção editorial', '16:9', 58, 35, 50, 22),
+  slot('home.hero-desktop', 'Página inicial', 'Capa principal · computador', 'Versão horizontal em alta resolução exibida em telas grandes.', '/media/hero-desktop-4k.png', 'Retrato de beleza com maquiagem iluminada e produção editorial', '16:9', 50, 50, 50, 50),
+  slot('home.hero-mobile', 'Página inicial', 'Capa principal · celular', 'Versão vertical criada especialmente para celulares.', '/media/hero-portrait.jpg', 'Retrato de beleza com maquiagem iluminada e produção editorial', '3:4', 50, 22, 50, 22),
   slot('portfolio.boss-main.desktop', 'Portfólio', 'Boss Portrait · computador', 'Card vertical principal do portfólio no computador.', '/media/boss-gold-portrait.webp', 'Ensaio de beleza com maquiagem iluminada em pele negra', '3:5', 50, 18, 50, 18),
   slot('portfolio.boss-main.mobile', 'Portfólio', 'Boss Portrait · celular', 'Versão do primeiro card exibida no celular.', '/media/boss-corset.webp', 'Ensaio editorial do Pacote Boss', '4:5', 50, 16, 50, 16),
   slot('portfolio.bridal-morning', 'Portfólio', 'Bridal Morning', 'Preparação da noiva em preto e branco.', '/media/bride-getting-ready-bw.jpg', 'Noiva sorrindo durante a preparação da maquiagem', '16:9', 50, 25, 50, 25),

@@ -256,7 +256,8 @@ export default function Home() {
 
       <section className="hero" id="inicio">
         <div className="hero-media">
-          <Image className="hero-image managed-media" src={getMedia('home.hero').url} alt={getMedia('home.hero').alt} fill sizes="100vw" preload style={managedMediaStyle(getMedia('home.hero'))} />
+          <Image className="hero-image hero-image-desktop managed-media" src={getMedia('home.hero-desktop').url} alt={getMedia('home.hero-desktop').alt} fill sizes="100vw" preload style={managedMediaStyle(getMedia('home.hero-desktop'))} />
+          <Image className="hero-image hero-image-mobile managed-media" src={getMedia('home.hero-mobile').url} alt={getMedia('home.hero-mobile').alt} fill sizes="100vw" preload style={managedMediaStyle(getMedia('home.hero-mobile'))} />
         </div>
         <div className="hero-shade" />
         <div className="hero-copy">
