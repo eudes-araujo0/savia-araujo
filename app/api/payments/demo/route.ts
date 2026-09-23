@@ -17,13 +17,15 @@ export async function POST(request: Request) {
   const booking = await getBooking(body.booking);
   if (!booking || booking.paymentProvider !== 'demo') return NextResponse.json({ error: 'Reserva não encontrada.' }, { status: 404 });
 
+  const paidAt = Date.now();
+  const paymentId = `DEMO-${paidAt}`;
   await updatePaymentResult({
     bookingId: booking.id,
-    paymentId: `DEMO-${Date.now()}`,
+    paymentId,
     paymentStatus: 'pago',
-    paidAt: Date.now(),
+    paidAt,
     confirmBooking: true,
   });
-  if (booking.paymentStatus !== 'pago') await notifyBooking({ ...booking, paymentStatus: 'pago', status: 'confirmado' }, 'payment_approved').catch(() => undefined);
+  if (booking.paymentStatus !== 'pago') await notifyBooking({ ...booking, paymentStatus: 'pago', status: 'confirmado', paymentId, paidAt }, 'payment_approved').catch(() => undefined);
   return NextResponse.json({ ok: true });
 }

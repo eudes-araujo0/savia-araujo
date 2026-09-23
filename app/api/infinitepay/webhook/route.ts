@@ -31,16 +31,17 @@ export async function POST(request: Request) {
     const reference = { orderNsu, transactionNsu, slug, receiptUrl: safeReceiptUrl(body?.receipt_url) };
     const payment = await checkInfinitePayPayment(reference);
     assertInfinitePayPayment(booking, reference, payment);
+    const paidAt = Date.now();
     await updatePaymentResult({
       bookingId: booking.id,
       paymentId: transactionNsu,
       paymentStatus: 'pago',
-      paidAt: Date.now(),
+      paidAt,
       confirmBooking: true,
       paymentReceiptUrl: reference.receiptUrl,
     });
     if (booking.paymentStatus !== 'pago') {
-      await notifyBooking({ ...booking, paymentStatus: 'pago', status: 'confirmado' }, 'payment_approved').catch((error) => console.error('infinitepay-notification-failed', error));
+      await notifyBooking({ ...booking, paymentStatus: 'pago', status: 'confirmado', paymentId: transactionNsu, paidAt, paymentReceiptUrl: reference.receiptUrl }, 'payment_approved').catch((error) => console.error('infinitepay-notification-failed', error));
     }
     return NextResponse.json({ success: true, message: null });
   } catch (error) {

@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import {
   anonymizeBooking, assertBookingAvailability, createBooking, createExpense, createScheduleBlock,
-  deleteExpense, deleteScheduleBlock, listExpenses, listScheduleBlocks, markBalanceReceived,
+  deleteExpense, deleteScheduleBlock, getBooking, listExpenses, listScheduleBlocks, markBalanceReceived,
   setManagementToken, updateBookingDetails,
 } from '../../../../db/bookings';
 import type { Booking } from '../../../../db/schema';
 import { getAdminSession } from '../../../../lib/admin-auth';
 import { isSameOriginRequest } from '../../../../lib/request-security';
 import { BOOKING_TIMES, SERVICE_CATALOG } from '../../../../lib/service-catalog';
+import { notifyBooking } from '../../../../lib/notifications';
 
 export async function GET() {
   if ((await getAdminSession())?.role !== 'master') return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
@@ -58,6 +59,7 @@ export async function POST(request: Request) {
       };
       await createBooking(booking);
       await setManagementToken(id, `${crypto.randomUUID().replaceAll('-', '')}${crypto.randomUUID().replaceAll('-', '')}`);
+      if (paid) await notifyBooking(booking, 'payment_approved').catch((error) => console.error('manual-payment-notification-failed', error));
       return NextResponse.json({ ok: true, id });
     }
     return NextResponse.json({ error: 'Ação inválida.' }, { status: 400 });
@@ -81,6 +83,8 @@ export async function PATCH(request: Request) {
     if (body.action === 'receive-balance') {
       assertKeys(body, ['action', 'id', 'amountCents']);
       await markBalanceReceived(id, validMoney(body.amountCents));
+      const updated = await getBooking(id);
+      if (updated) await notifyBooking(updated, 'balance_received').catch((error) => console.error('balance-notification-failed', error));
       return NextResponse.json({ ok: true });
     }
     if (body.action === 'anonymize-booking') {

@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     const consent = text(form, 'consent');
     const catalogItem = SERVICE_CATALOG[service];
 
-    if (!catalogItem || !clientName || !whatsapp || !appointmentDate || !appointmentTime || consent !== 'accepted') {
+    if (!catalogItem || !clientName || !whatsapp || !email || !appointmentDate || !appointmentTime || consent !== 'accepted') {
       return NextResponse.json({ error: 'Preencha os dados obrigatórios do agendamento.' }, { status: 400 });
     }
     if (clientName.length < 2 || clientName.length > 120 || !/^[\p{L}\p{M} .'-]+$/u.test(clientName)) {
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     }
     const whatsappDigits = whatsapp.replace(/\D/g, '');
     if (whatsappDigits.length < 10 || whatsappDigits.length > 13) return NextResponse.json({ error: 'Informe um WhatsApp válido.' }, { status: 400 });
-    if (email && (email.length > 160 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) return NextResponse.json({ error: 'Informe um e-mail válido.' }, { status: 400 });
+    if (email.length > 160 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: 'Informe um e-mail válido para receber a confirmação.' }, { status: 400 });
     if (notes.length > 1200) return NextResponse.json({ error: 'As observações excedem o limite permitido.' }, { status: 400 });
     if (!/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate) || !allowedTimes.has(appointmentTime) || appointmentDate < todayInSaoPaulo()) {
       return NextResponse.json({ error: 'Data ou horário inválido.' }, { status: 400 });
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
       createdAt: Date.now(),
       clientName,
       whatsapp: whatsapp.slice(0, 30),
-      email: email || null,
+      email,
       service,
       serviceLabel: catalogItem.label,
       appointmentDate,

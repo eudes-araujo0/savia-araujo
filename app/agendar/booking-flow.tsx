@@ -90,7 +90,7 @@ export default function BookingFlow({ initialService, initialPayment, initialBoo
   async function submitBooking(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError('');
-    if (!data.name || !data.whatsapp) return setError('Informe seu nome e WhatsApp para finalizar.');
+    if (!data.name || !data.whatsapp || !data.email) return setError('Informe seu nome, WhatsApp e e-mail para finalizar.');
     if (!data.consent) return setError('Confirme que leu os termos e a política de privacidade.');
 
     const payload = new FormData();
@@ -190,7 +190,7 @@ export default function BookingFlow({ initialService, initialPayment, initialBoo
               <div className="form-grid">
                 <div className="form-field"><label htmlFor="name">Nome completo</label><input id="name" value={data.name} onChange={(event) => setData({ ...data, name: event.target.value })} placeholder="Como podemos chamar você?" required /></div>
                 <div className="form-field"><label htmlFor="whatsapp">WhatsApp</label><input id="whatsapp" value={data.whatsapp} onChange={(event) => setData({ ...data, whatsapp: event.target.value })} placeholder="(81) 99999-9999" required /></div>
-                <div className="form-field full"><label htmlFor="email">E-mail</label><input id="email" type="email" value={data.email} onChange={(event) => setData({ ...data, email: event.target.value })} placeholder="voce@email.com" /></div>
+                <div className="form-field full"><label htmlFor="email">E-mail para confirmação</label><input id="email" type="email" value={data.email} onChange={(event) => setData({ ...data, email: event.target.value })} placeholder="voce@email.com" autoComplete="email" required /><small>Pagamento e agendamento serão confirmados neste endereço.</small></div>
                 <div className="form-field full"><label htmlFor="notes">Conte um pouco sobre o evento</label><textarea id="notes" value={data.notes} onChange={(event) => setData({ ...data, notes: event.target.value })} placeholder="Tipo de evento, local, referências ou algum detalhe importante..." /></div>
                 {selectedService && selectedService.priceCents > 0 && <div className="payment-choice full">
                   <span className="payment-choice-label">Como deseja pagar pelo site?</span>

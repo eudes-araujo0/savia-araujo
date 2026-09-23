@@ -22,14 +22,16 @@ export async function POST(request: Request) {
     }
 
     const approved = payment.status === 'approved';
+    const paidAt = approved ? Date.parse(payment.date_approved || new Date().toISOString()) : null;
+    const paymentId = String(payment.id);
     await updatePaymentResult({
       bookingId: booking.id,
-      paymentId: String(payment.id),
+      paymentId,
       paymentStatus: mapPaymentStatus(payment.status || ''),
-      paidAt: approved ? Date.parse(payment.date_approved || new Date().toISOString()) : null,
+      paidAt,
       confirmBooking: approved,
     });
-    if (approved && booking.paymentStatus !== 'pago') await notifyBooking({ ...booking, paymentStatus: 'pago', status: 'confirmado' }, 'payment_approved').catch((notificationError) => console.error('payment-notification-failed', notificationError));
+    if (approved && booking.paymentStatus !== 'pago') await notifyBooking({ ...booking, paymentStatus: 'pago', status: 'confirmado', paymentId, paidAt }, 'payment_approved').catch((notificationError) => console.error('payment-notification-failed', notificationError));
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error('mercado-pago-webhook-failed', error);

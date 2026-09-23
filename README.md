@@ -17,6 +17,7 @@ Projeto completo em Next.js para publicar na Vercel, com serviços de maquiagem,
 - agendamentos, receitas, despesas, saldos e resultado agrupados por dia, com exportação CSV;
 - confirmação automática da InfinitePay e confirmação manual restrita ao acesso master;
 - link seguro para a cliente acompanhar, pagar novamente, cancelar ou reagendar;
+- e-mails transacionais via Resend para cliente e proprietária, com dados da venda, agendamento, comprovante e saldo restante;
 - criptografia AES-GCM dos dados pessoais e rate limit persistente no login e no agendamento;
 - RLS ativo no PostgreSQL e acesso administrativo exclusivo da conta master;
 - biblioteca visual master para trocar todas as fotos, ajustar foco, altura e zoom separadamente no computador e celular, com histórico de versões;
@@ -64,9 +65,9 @@ Cadastre estas variáveis em **Vercel > Project > Settings > Environment Variabl
 | `CRON_SECRET` | Segredo usado pela Vercel para proteger o envio diário de lembretes. |
 | `NOTIFICATION_WEBHOOK_URL` | Webhook opcional de WhatsApp/automação para avisos. |
 | `NOTIFICATION_WEBHOOK_SECRET` | Segredo enviado no webhook de notificações. |
-| `RESEND_API_KEY` | Chave opcional para enviar e-mail à cliente. |
-| `NOTIFICATION_FROM_EMAIL` | Remetente validado no serviço de e-mail. |
-| `NOTIFICATION_OWNER_EMAIL` | E-mail da Sávia para receber avisos da agenda. |
+| `RESEND_API_KEY` | Chave do Resend com permissão de envio. |
+| `NOTIFICATION_FROM_EMAIL` | Remetente verificado, por exemplo `Sávia Araújo <agenda@mail.seudominio.com.br>`. |
+| `NOTIFICATION_OWNER_EMAIL` | E-mail da Sávia para receber solicitações, vendas, saldos e agendamentos confirmados. |
 | `BUSINESS_ADDRESS` | Endereço incluído nos lembretes, quando configurado. |
 
 Nunca publique o arquivo `.env.local` nem coloque senhas ou chaves diretamente no código. Para gerar os segredos no PowerShell:
@@ -100,7 +101,25 @@ Para Sávia trocar as fotos pelo painel:
 4. faça um novo deploy;
 5. entre em **Painel > Imagens do site**, escolha uma área, envie a foto, confira as abas Computador e Celular, arraste o ponto focal, ajuste o zoom e publique.
 
-Somente a sessão master recebe autorização temporária de upload. Os arquivos aceitos são JPG, PNG, WebP e AVIF, até 20 MB. Cada publicação preserva uma versão anterior para restauração. Os arquivos do Blob são públicos porque aparecem no site; dados pessoais e comprovantes continuam fora dessa biblioteca.
+Somente a sessão master recebe autorização temporária de upload. Os arquivos aceitos são JPG, PNG, WebP e AVIF, até 50 MB, preservados sem recompressão. Cada publicação preserva uma versão anterior para restauração. Os arquivos do Blob são públicos porque aparecem no site; dados pessoais e comprovantes continuam fora dessa biblioteca.
+
+### Ativar os e-mails do Resend
+
+1. crie uma conta no Resend e adicione um domínio ou subdomínio de envio, preferencialmente `mail.seudominio.com.br`;
+2. publique no DNS os registros SPF e DKIM mostrados pelo Resend e aguarde o status **Verified**;
+3. crie uma API key de envio e salve-a na Vercel como `RESEND_API_KEY`;
+4. defina `NOTIFICATION_FROM_EMAIL`, por exemplo `Sávia Araújo <agenda@mail.seudominio.com.br>`;
+5. defina `NOTIFICATION_OWNER_EMAIL` com o e-mail que receberá os avisos administrativos;
+6. faça um novo deploy e realize um agendamento de teste.
+
+O formulário público exige um e-mail válido. Cada canal de entrega é controlado separadamente e as chamadas ao Resend usam chaves de idempotência, evitando mensagens repetidas quando a InfinitePay reenviar um webhook.
+
+Quando o pagamento é aprovado:
+
+- cliente e proprietária recebem data, horário, serviço, código da reserva, total e valor pago;
+- no pagamento integral, o e-mail informa que não há saldo pendente;
+- no sinal de 50%, o e-mail destaca o valor restante e informa que ele será cobrado posteriormente;
+- quando o saldo for registrado no painel, um novo e-mail confirma o recebimento e informa se a reserva está quitada.
 
 ## 4. Publicar na Vercel
 
@@ -120,6 +139,14 @@ npm install -g vercel
 vercel
 vercel --prod
 ```
+
+### Conectar o domínio definitivo
+
+1. registre o domínio escolhido em um provedor de sua preferência;
+2. abra **Vercel > Project > Settings > Domains**, adicione o domínio principal e também a versão com `www`;
+3. copie para o DNS os registros indicados pela Vercel e escolha qual versão será redirecionada para a outra;
+4. após a validação, altere `NEXT_PUBLIC_SITE_URL` para a URL definitiva com `https://`;
+5. confira no Resend se o subdomínio de e-mail continua verificado e faça um novo deploy de produção.
 
 ## 5. Ativar a InfinitePay
 

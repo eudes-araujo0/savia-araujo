@@ -39,14 +39,16 @@ export async function POST(request: Request) {
   try {
     if (action === 'manual-paid') {
       if (booking.paymentAmountCents <= 0) throw new Error('Esta reserva não possui valor de pagamento definido.');
+      const paidAt = Date.now();
+      const paymentId = `MANUAL-${paidAt}`;
       await updatePaymentResult({
         bookingId: booking.id,
-        paymentId: `MANUAL-${Date.now()}`,
+        paymentId,
         paymentStatus: 'pago',
-        paidAt: Date.now(),
+        paidAt,
         confirmBooking: true,
       });
-      if (booking.paymentStatus !== 'pago') await notifyBooking({ ...booking, paymentStatus: 'pago', status: 'confirmado' }, 'payment_approved').catch(() => undefined);
+      if (booking.paymentStatus !== 'pago') await notifyBooking({ ...booking, paymentStatus: 'pago', status: 'confirmado', paymentId, paidAt }, 'payment_approved').catch(() => undefined);
       return NextResponse.json({ ok: true, paymentStatus: 'pago', source: 'manual' }, { headers: { 'cache-control': 'no-store' } });
     }
 
@@ -63,12 +65,12 @@ export async function POST(request: Request) {
         throw new Error('Identificação do pagamento InfinitePay incompleta.');
       }
       const result = await reconcileInfinitePayBooking(booking, { orderNsu: booking.id, transactionNsu, slug, receiptUrl: safeUrl(body.receiptUrl) });
-      if (booking.paymentStatus !== 'pago') await notifyBooking({ ...booking, paymentStatus: 'pago', status: 'confirmado' }, 'payment_approved').catch(() => undefined);
+      if (booking.paymentStatus !== 'pago') await notifyBooking({ ...booking, paymentStatus: 'pago', status: 'confirmado', paymentId: result.paymentId, paidAt: result.paidAt, paymentReceiptUrl: result.paymentReceiptUrl }, 'payment_approved').catch(() => undefined);
       return NextResponse.json({ ok: true, paymentStatus: result.paymentStatus, source: 'infinitepay' }, { headers: { 'cache-control': 'no-store' } });
     }
 
     const result = await reconcileMercadoPagoBooking(booking, body.paymentId?.trim() || undefined);
-    if (result.approved && booking.paymentStatus !== 'pago') await notifyBooking({ ...booking, paymentStatus: 'pago', status: 'confirmado' }, 'payment_approved').catch(() => undefined);
+    if (result.approved && booking.paymentStatus !== 'pago') await notifyBooking({ ...booking, paymentStatus: 'pago', status: 'confirmado', paymentId: result.paymentId, paidAt: result.paidAt }, 'payment_approved').catch(() => undefined);
     return NextResponse.json({ ok: true, paymentStatus: result.paymentStatus, source: 'mercado_pago' }, { headers: { 'cache-control': 'no-store' } });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : 'Não foi possível conferir o pagamento.' }, { status: 400 });
