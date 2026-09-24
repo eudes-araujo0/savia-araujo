@@ -140,9 +140,13 @@ export default function BookingFlow({ initialMedia, initialServices: services, i
       const response = await fetch('/api/bookings', { method: 'POST', body: payload });
       const result = (await response.json()) as { id?: string; error?: string; paymentAmountCents?: number; paymentUrl?: string | null; paymentMode?: string; paymentError?: string; manageUrl?: string };
       if (!response.ok) throw new Error(result.error || 'Não foi possível registrar o agendamento.');
+      if (result.paymentUrl) {
+        window.location.replace(result.paymentUrl);
+        return;
+      }
       setBookingId(result.id || 'confirmado');
       setPaymentAmountCents(result.paymentAmountCents || 0);
-      setPaymentUrl(result.paymentUrl || null);
+      setPaymentUrl(null);
       setPaymentNotice(result.paymentError || '');
       setManageUrl(result.manageUrl || '');
       setStep(4);
@@ -294,7 +298,7 @@ export default function BookingFlow({ initialMedia, initialServices: services, i
           {step < 4 && (
             <div className="booking-actions">
               {step > 1 && <button className="back-button" type="button" onClick={() => setStep((current) => current - 1)}>Voltar</button>}
-              {step < 3 ? <button className="button button-dark" type="button" onClick={nextStep}>Continuar <ArrowRight size={16} /></button> : <button className="button button-dark" type="submit" disabled={submitting}>{submitting ? 'Enviando...' : selectedService?.priceCents ? 'Continuar para o pagamento' : 'Solicitar orçamento'} <ArrowRight size={16} /></button>}
+              {step < 3 ? <button className="button button-dark" type="button" onClick={nextStep}>Continuar <ArrowRight size={16} /></button> : <button className="button button-dark" type="submit" disabled={submitting}>{submitting ? (selectedService?.priceCents ? 'Abrindo pagamento...' : 'Enviando...') : selectedService?.priceCents ? 'Finalizar e ir para o pagamento' : 'Solicitar orçamento'} <ArrowRight size={16} /></button>}
             </div>
           )}
         </form>
