@@ -15,8 +15,6 @@ export type BookableService = {
   updatedAt: number | null;
 };
 
-export const BOOKING_TIMES = ['08:00', '09:30', '11:00', '13:30', '15:00', '16:30', '18:00', '19:30'];
-
 export const BOOKABLE_SERVICES: BookableService[] = [
   service('make-express', 'makeup', 'Maquiagem', 'Make Express', 'Leve & essencial', 'Maquiagem natural para uma produção rápida e elegante. Não inclui cílios.', [], 9000, 60, 1),
   service('make-social', 'makeup', 'Maquiagem', 'Make Social', 'Para ser lembrada', 'Produção elaborada para festas, fotos e eventos, com acabamento pensado para durar.', [], 12000, 90, 2),

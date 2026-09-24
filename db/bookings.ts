@@ -1,7 +1,9 @@
 import type { Booking, Expense, ScheduleBlock } from './schema';
 import { decryptSensitive, encryptSensitive } from '../lib/data-crypto';
-import { BOOKING_TIMES, isBridalService } from '../lib/service-catalog';
+import { isBridalService } from '../lib/service-catalog';
+import { buildScheduleTimes, isBusinessDay, isPastScheduleTime, todayInSaoPaulo } from '../lib/business-hours';
 import { getService } from './services';
+import { getBusinessSchedule } from './schedule';
 import { database } from './client';
 
 export { database } from './client';
@@ -195,28 +197,37 @@ export async function getBooking(id: string): Promise<Booking | null> {
   return rows[0] ? await mapBooking(rows[0] as Record<string, unknown>) : null;
 }
 
-export async function listUnavailableTimes(appointmentDate: string, requestedService = '', requestedDuration?: number): Promise<string[]> {
+export async function getBookingAvailability(appointmentDate: string, requestedService = '', requestedDuration?: number) {
   await ensureBookingsSchema();
   await expireStaleBookings();
   const sql = database();
+  const schedule = await getBusinessSchedule();
+  const duration = requestedDuration || (await getService(requestedService, true))?.durationMinutes || 90;
+  const times = buildScheduleTimes(schedule, appointmentDate, duration);
+  if (!isBusinessDay(schedule, appointmentDate)) return { times: [], unavailable: [], closed: true };
   const rows = await sql`SELECT appointment_time, service, duration_minutes FROM bookings WHERE appointment_date = ${appointmentDate} AND status NOT IN ('cancelado', 'expirado')`;
   const blocks = await sql`SELECT start_time, end_time FROM schedule_blocks WHERE block_date = ${appointmentDate}`;
   if (blocks.some((block) => !block.start_time || !block.end_time) || (isBridalService(requestedService) && rows.length > 0) || rows.some((row) => isBridalService(String(row.service)))) {
-    return BOOKING_TIMES;
+    return { times, unavailable: times, closed: false };
   }
-  const duration = requestedDuration || (await getService(requestedService, true))?.durationMinutes || 90;
-  return BOOKING_TIMES.filter((time) => {
+  const unavailable = times.filter((time) => {
     const start = timeToMinutes(time);
     const end = start + duration;
     const bookingCollision = rows.some((row) => rangesOverlap(start, end, timeToMinutes(String(row.appointment_time)), timeToMinutes(String(row.appointment_time)) + Number(row.duration_minutes || 90)));
     const blockCollision = blocks.some((block) => rangesOverlap(start, end, timeToMinutes(String(block.start_time)), timeToMinutes(String(block.end_time))));
-    return bookingCollision || blockCollision;
+    return isPastScheduleTime(appointmentDate, time) || bookingCollision || blockCollision;
   });
+  return { times, unavailable, closed: false };
 }
 
 export async function assertBookingAvailability(appointmentDate: string, appointmentTime: string, requestedService: string, excludeId = '', requestedDuration?: number) {
   await ensureBookingsSchema();
   await expireStaleBookings();
+  const duration = requestedDuration || (await getService(requestedService, true))?.durationMinutes || 90;
+  const schedule = await getBusinessSchedule();
+  if (appointmentDate < todayInSaoPaulo() || isPastScheduleTime(appointmentDate, appointmentTime)) throw new Error('Este horário já passou. Escolha um horário futuro.');
+  if (!isBusinessDay(schedule, appointmentDate)) throw new Error('A agenda não funciona neste dia da semana.');
+  if (!buildScheduleTimes(schedule, appointmentDate, duration).includes(appointmentTime)) throw new Error('Este horário está fora do expediente ou não respeita o intervalo configurado.');
   const sql = database();
   const rows = await sql`SELECT appointment_time, service, duration_minutes FROM bookings WHERE appointment_date = ${appointmentDate} AND status NOT IN ('cancelado', 'expirado') AND (${excludeId} = '' OR id != ${excludeId})`;
   const blocks = await sql`SELECT start_time, end_time FROM schedule_blocks WHERE block_date = ${appointmentDate}`;
@@ -228,7 +239,6 @@ export async function assertBookingAvailability(appointmentDate: string, appoint
     throw new Error('Esta data está reservada com exclusividade para uma noiva.');
   }
   const start = timeToMinutes(appointmentTime);
-  const duration = requestedDuration || (await getService(requestedService, true))?.durationMinutes || 90;
   const end = start + duration;
   if (rows.some((row) => rangesOverlap(start, end, timeToMinutes(String(row.appointment_time)), timeToMinutes(String(row.appointment_time)) + Number(row.duration_minutes || 90)))) {
     throw new Error('Este horário está indisponível. Escolha outro horário.');

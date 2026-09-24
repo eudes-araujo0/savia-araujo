@@ -1,16 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getAdminSession } from '../../../lib/admin-auth';
-import { createPaymentCheckout } from '../../../lib/mercado-pago';
+import { createPaymentCheckout, getPaymentMode } from '../../../lib/payments';
 import { assertBookingAvailability, createBooking, listBookings, pendingExpiry, setManagementToken, updateBookingStatus, updatePaymentPreference } from '../../../db/bookings';
 import type { Booking } from '../../../db/schema';
 import { isSameOriginRequest, requestFingerprint } from '../../../lib/request-security';
-import { BOOKING_TIMES } from '../../../lib/service-catalog';
+import { isValidIsoDate, todayInSaoPaulo } from '../../../lib/business-hours';
 import { notifyBooking } from '../../../lib/notifications';
 import { runtimeValue } from '../../../lib/runtime-env';
 import { checkBookingRateLimit, recordBookingAttempt } from '../../../db/security';
 import { getService } from '../../../db/services';
-
-const allowedTimes = new Set(BOOKING_TIMES);
 
 export async function POST(request: Request) {
   if (!isSameOriginRequest(request)) return NextResponse.json({ error: 'Origem não autorizada.' }, { status: 403 });
@@ -47,7 +45,7 @@ export async function POST(request: Request) {
     if (whatsappDigits.length < 10 || whatsappDigits.length > 13) return NextResponse.json({ error: 'Informe um WhatsApp válido.' }, { status: 400 });
     if (email.length > 160 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return NextResponse.json({ error: 'Informe um e-mail válido para receber a confirmação.' }, { status: 400 });
     if (notes.length > 1200) return NextResponse.json({ error: 'As observações excedem o limite permitido.' }, { status: 400 });
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(appointmentDate) || !allowedTimes.has(appointmentTime) || appointmentDate < todayInSaoPaulo()) {
+    if (!isValidIsoDate(appointmentDate) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(appointmentTime) || appointmentDate < todayInSaoPaulo()) {
       return NextResponse.json({ error: 'Data ou horário inválido.' }, { status: 400 });
     }
 
@@ -57,6 +55,9 @@ export async function POST(request: Request) {
     if (requestedPaymentOption && !['deposit', 'full'].includes(requestedPaymentOption)) return NextResponse.json({ error: 'Forma de pagamento inválida.' }, { status: 400 });
     const paymentOption = requestedPaymentOption === 'full' ? 'full' : 'deposit';
     const paymentAmountCents = catalogItem.priceCents ? (paymentOption === 'full' ? catalogItem.priceCents : depositCents) : 0;
+    if (paymentAmountCents && getPaymentMode() !== 'infinitepay') {
+      return NextResponse.json({ error: 'O pagamento pela InfinitePay ainda não está configurado. Tente novamente mais tarde.' }, { status: 503 });
+    }
     const expiresAt = paymentAmountCents ? pendingExpiry() : null;
     const consentAt = Date.now();
     const managementToken = `${crypto.randomUUID().replaceAll('-', '')}${crypto.randomUUID().replaceAll('-', '')}`;
@@ -111,13 +112,13 @@ export async function POST(request: Request) {
     if (!paymentAmountCents) return bookingResponse({ id, paymentAmountCents, balanceCents: 0, paymentMode: 'unavailable', paymentUrl: null, manageUrl }, id, managementToken);
 
     try {
-      const checkout = await createPaymentCheckout(booking, origin, managementToken);
+      const checkout = await createPaymentCheckout(booking, origin);
       await updatePaymentPreference(id, checkout.mode, checkout.preferenceId, checkout.paymentUrl);
       return bookingResponse({ id, paymentAmountCents, paymentOption, balanceCents: booking.balanceCents, paymentMode: checkout.mode, paymentUrl: checkout.paymentUrl, manageUrl }, id, managementToken);
     } catch (paymentError) {
       console.error('payment-preference-failed', paymentError);
       await updatePaymentPreference(id, 'unavailable', null, null);
-      return bookingResponse({ id, paymentAmountCents, paymentOption, balanceCents: booking.balanceCents, paymentMode: 'unavailable', paymentUrl: null, manageUrl, paymentError: 'A reserva foi registrada, mas o pagamento está temporariamente indisponível.' }, id, managementToken);
+      return bookingResponse({ id, paymentAmountCents, paymentOption, balanceCents: booking.balanceCents, paymentMode: 'unavailable', paymentUrl: null, manageUrl, paymentError: 'A pré-reserva foi registrada, mas a InfinitePay está temporariamente indisponível. Tente gerar o pagamento novamente pela página da reserva.' }, id, managementToken);
     }
   } catch (error) {
     console.error('booking-create-failed', error);
@@ -153,10 +154,6 @@ export async function PATCH(request: Request) {
 function text(form: FormData, key: string) {
   const value = form.get(key);
   return typeof value === 'string' ? value.trim() : '';
-}
-
-function todayInSaoPaulo() {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 }
 
 function bookingResponse(payload: Record<string, unknown>, id: string, token: string) {

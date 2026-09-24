@@ -10,18 +10,19 @@ Projeto completo em Next.js para publicar na Vercel, com serviços de maquiagem,
 - reserva exclusiva da data para os pacotes de noiva;
 - escolha entre sinal de 50% ou pagamento integral;
 - checkout InfinitePay (Pix e cartão) com confirmação por webhook e conferência direta na API;
-- modo de demonstração sem cobrança real;
+- checkout exclusivamente de produção pela InfinitePay, sem simulador ou aprovação manual do pagamento inicial;
 - login administrativo por usuário e senha, com redefinição segura pela própria proprietária;
 - agenda inteligente com duração por serviço, bloqueio manual e pré-reserva de 30 minutos;
 - criação e edição de atendimentos, clientes pagos, pendentes, financeiro, despesas e comprovantes no painel;
 - agendamentos, receitas, despesas, saldos e resultado agrupados por dia, com exportação CSV;
-- confirmação automática da InfinitePay e confirmação manual restrita ao acesso master;
+- confirmação automática após conferência direta da transação na API da InfinitePay;
 - link seguro para a cliente acompanhar, pagar novamente, cancelar ou reagendar;
 - e-mails transacionais via Resend para cliente e proprietária, com dados da venda, agendamento, comprovante e saldo restante;
 - criptografia AES-GCM dos dados pessoais e rate limit persistente no login e no agendamento;
 - RLS ativo no PostgreSQL e acesso administrativo exclusivo da conta master;
 - biblioteca visual master para trocar todas as fotos, ajustar foco, altura e zoom separadamente no computador e celular, com histórico de versões;
 - catálogo administrativo para editar nomes, descrições, itens inclusos, valores, duração e disponibilidade dos serviços;
+- calendário administrativo para definir dias de funcionamento, expediente e intervalo entre horários;
 - criação automática das tabelas no primeiro acesso ao banco.
 
 ## 1. Preparar o projeto localmente
@@ -58,11 +59,7 @@ Cadastre estas variáveis em **Vercel > Project > Settings > Environment Variabl
 | `ADMIN_SESSION_SECRET` | Segredo longo e aleatório para assinar a sessão. |
 | `DATA_ENCRYPTION_KEY` | Segredo com 32 ou mais caracteres para criptografar nome, contato e observações. |
 | `BLOB_READ_WRITE_TOKEN` | Token adicionado automaticamente ao conectar um Vercel Blob público ao projeto. |
-| `PAYMENTS_DEMO_MODE` | `true` para demonstração; `false` para cobrança real. |
-| `PAYMENT_PROVIDER` | Use `infinitepay` para a integração principal. |
 | `INFINITEPAY_HANDLE` | InfiniteTag da Sávia, sem o caractere `$`. |
-| `MERCADO_PAGO_ACCESS_TOKEN` | Access Token da aplicação no Mercado Pago. |
-| `MERCADO_PAGO_WEBHOOK_SECRET` | Assinatura secreta configurada no webhook. |
 | `CRON_SECRET` | Segredo usado pela Vercel para proteger o envio diário de lembretes. |
 | `NOTIFICATION_WEBHOOK_URL` | Webhook opcional de WhatsApp/automação para avisos. |
 | `NOTIFICATION_WEBHOOK_SECRET` | Segredo enviado no webhook de notificações. |
@@ -92,7 +89,7 @@ Copie apenas o resultado para `ADMIN_PASSWORD_HASH`. Depois remova `ADMIN_PASSWO
 
 As variáveis `ADMIN_USERNAME` e `ADMIN_PASSWORD_HASH` criam o primeiro acesso. Depois, em **Painel > Acesso e segurança**, a proprietária pode definir seu usuário e sua senha definitivos. A partir desse primeiro salvamento, as credenciais protegidas no Neon passam a substituir o acesso temporário das variáveis e as outras sessões são encerradas. Em caso de perda do acesso, remova somente a linha `master` da tabela `admin_credentials` na Neon para voltar ao acesso inicial das variáveis.
 
-Durante a apresentação, use `PAYMENTS_DEMO_MODE=true`. Para produção, altere para `false`, use `PAYMENT_PROVIDER=infinitepay`, informe a `INFINITEPAY_HANDLE` e faça um novo deploy.
+O checkout é sempre real e utiliza exclusivamente a InfinitePay. Sem `INFINITEPAY_HANDLE`, o servidor recusa novos agendamentos pagos com uma mensagem clara; não existe fallback demonstrativo.
 
 ### Biblioteca de imagens
 
@@ -164,7 +161,7 @@ No aplicativo ou painel web da InfinitePay:
 1. acesse **Vendas > Checkout > Configurações**;
 2. habilite o Checkout Integrado;
 3. copie a InfiniteTag para `INFINITEPAY_HANDLE`, sem `$`;
-4. configure `PAYMENT_PROVIDER=infinitepay` e `PAYMENTS_DEMO_MODE=false` na Vercel;
+4. configure `INFINITEPAY_HANDLE` na Vercel com a InfiniteTag, sem o caractere `$`;
 5. faça um novo deploy. O próprio site informa à InfinitePay o webhook:
 
 ```text
@@ -173,7 +170,7 @@ https://SEU-DOMINIO/api/infinitepay/webhook
 
 O agendamento nasce como pendente. A cliente escolhe sinal de 50% ou valor integral e a reserva só muda para confirmada quando a transação é conferida pela API da InfinitePay. O `order_nsu`, o valor, o identificador da transação e o pedido do banco são validados antes da confirmação. Pendências ficam na aba **Pendências**; o financeiro considera apenas pagamentos aprovados e saldos registrados. O comprovante digital da InfinitePay fica disponível no painel quando retornado pelo checkout.
 
-O Mercado Pago continua no código como alternativa: use `PAYMENT_PROVIDER=mercado_pago` e as duas variáveis `MERCADO_PAGO_*` se quiser reativá-lo.
+O valor é enviado em centavos e o sistema só confirma a reserva depois de consultar `payment_check` e validar pedido, transação, fatura e valor diretamente na InfinitePay. A confirmação manual do pagamento inicial foi removida para manter o financeiro fiel ao provedor.
 
 ## Segurança aplicada
 
@@ -200,4 +197,4 @@ npm run lint
 npm run build
 ```
 
-Após o deploy, primeiro teste com `PAYMENTS_DEMO_MODE=true`. Em seguida, ative a InfinitePay, faça uma cobrança real de valor baixo e confirme: retorno ao site, webhook, mudança automática para pago, comprovante, agrupamento do dia e valores do financeiro.
+Após o deploy, habilite o Checkout Integrado na InfinitePay e faça uma cobrança real de valor baixo. Confirme: retorno ao site, webhook, mudança automática para pago, comprovante, e-mails, agrupamento do dia e valores do financeiro. Estorne a cobrança de homologação pelo aplicativo da InfinitePay após concluir a validação.

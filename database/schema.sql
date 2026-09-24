@@ -92,6 +92,16 @@ CREATE TABLE IF NOT EXISTS schedule_blocks (
 );
 CREATE INDEX IF NOT EXISTS idx_schedule_blocks_date ON schedule_blocks(block_date);
 
+CREATE TABLE IF NOT EXISTS business_schedule (
+  id TEXT PRIMARY KEY,
+  open_days TEXT NOT NULL,
+  start_time TEXT NOT NULL,
+  end_time TEXT NOT NULL,
+  slot_interval_minutes INTEGER NOT NULL,
+  updated_at BIGINT NOT NULL,
+  CONSTRAINT business_schedule_singleton CHECK (id = 'main')
+);
+
 CREATE TABLE IF NOT EXISTS expenses (
   id TEXT PRIMARY KEY,
   expense_date TEXT NOT NULL,
@@ -115,16 +125,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_notification_once ON notification_deliveri
 
 ALTER TABLE schedule_blocks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE schedule_blocks FORCE ROW LEVEL SECURITY;
+ALTER TABLE business_schedule ENABLE ROW LEVEL SECURITY;
+ALTER TABLE business_schedule FORCE ROW LEVEL SECURITY;
 ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE expenses FORCE ROW LEVEL SECURITY;
 ALTER TABLE notification_deliveries ENABLE ROW LEVEL SECURITY;
 ALTER TABLE notification_deliveries FORCE ROW LEVEL SECURITY;
-REVOKE ALL ON schedule_blocks, expenses, notification_deliveries FROM PUBLIC;
+REVOKE ALL ON schedule_blocks, business_schedule, expenses, notification_deliveries FROM PUBLIC;
 
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = current_schema() AND tablename = 'schedule_blocks' AND policyname = 'schedule_blocks_backend_only') THEN
     CREATE POLICY schedule_blocks_backend_only ON schedule_blocks TO CURRENT_USER USING (true) WITH CHECK (true);
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = current_schema() AND tablename = 'business_schedule' AND policyname = 'business_schedule_backend_only') THEN
+    CREATE POLICY business_schedule_backend_only ON business_schedule TO CURRENT_USER USING (true) WITH CHECK (true);
   END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname = current_schema() AND tablename = 'expenses' AND policyname = 'expenses_backend_only') THEN
     CREATE POLICY expenses_backend_only ON expenses TO CURRENT_USER USING (true) WITH CHECK (true);

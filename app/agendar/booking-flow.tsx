@@ -3,12 +3,12 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { ArrowLeft, ArrowRight, Check, CreditCard, ShieldCheck } from 'lucide-react';
-import { BOOKING_TIMES, type BookableService } from '../../lib/service-catalog';
+import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, CreditCard, ShieldCheck } from 'lucide-react';
+import type { BookableService } from '../../lib/service-catalog';
+import type { BusinessSchedule } from '../../db/schema';
 import { useSiteMedia } from '../../lib/use-site-media';
 import { managedMediaStyle, type SiteMediaValue } from '../../lib/site-media';
 
-const times = BOOKING_TIMES;
 const serviceGroups = ['makeup', 'noivas', 'boss'] as const;
 
 type BookingData = {
@@ -25,9 +25,9 @@ type BookingData = {
 
 const initialData: BookingData = { service: '', date: '', time: '', name: '', whatsapp: '', email: '', notes: '', paymentOption: 'deposit', consent: false };
 
-type Props = { initialMedia: SiteMediaValue[]; initialServices: BookableService[]; initialService: string; initialPayment: string; initialBooking: string; initialToken: string; initialPaymentId: string; initialTransactionNsu: string; initialSlug: string; initialReceiptUrl: string };
+type Props = { initialMedia: SiteMediaValue[]; initialServices: BookableService[]; initialSchedule: BusinessSchedule; initialService: string; initialPayment: string; initialBooking: string; initialToken: string; initialTransactionNsu: string; initialSlug: string; initialReceiptUrl: string };
 
-export default function BookingFlow({ initialMedia, initialServices: services, initialService, initialPayment, initialBooking, initialToken, initialPaymentId, initialTransactionNsu, initialSlug, initialReceiptUrl }: Props) {
+export default function BookingFlow({ initialMedia, initialServices: services, initialSchedule, initialService, initialPayment, initialBooking, initialToken, initialTransactionNsu, initialSlug, initialReceiptUrl }: Props) {
   const getMedia = useSiteMedia(initialMedia);
   const requestedService = services.some((service) => service.code === initialService) ? initialService : '';
   const requestedGroup = services.find((service) => service.code === requestedService)?.group || 'makeup';
@@ -37,22 +37,26 @@ export default function BookingFlow({ initialMedia, initialServices: services, i
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [bookingId, setBookingId] = useState(returnedFromPayment ? initialBooking : '');
+  const [times, setTimes] = useState<string[]>([]);
   const [unavailableTimes, setUnavailableTimes] = useState<string[]>([]);
+  const [availabilityClosed, setAvailabilityClosed] = useState(false);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
-  const [paymentMode, setPaymentMode] = useState('');
   const [paymentAmountCents, setPaymentAmountCents] = useState(0);
   const [paymentNotice, setPaymentNotice] = useState('');
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [returnStatus] = useState(returnedFromPayment ? initialPayment : '');
   const [activeGroup, setActiveGroup] = useState<(typeof serviceGroups)[number]>(requestedGroup);
   const [manageUrl, setManageUrl] = useState(returnedFromPayment && initialToken ? `/reserva/${encodeURIComponent(initialBooking)}?token=${encodeURIComponent(initialToken)}` : '');
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const [calendarMonth, setCalendarMonth] = useState(`${today.slice(0, 7)}-01`);
 
   useEffect(() => {
-    if (initialPayment !== 'success' || !initialBooking || (!initialPaymentId && !(initialTransactionNsu && initialSlug))) return;
+    if (initialPayment !== 'success' || !initialBooking || !(initialTransactionNsu && initialSlug)) return;
     fetch('/api/payments/reconcile', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ bookingId: initialBooking, paymentId: initialPaymentId || undefined, transactionNsu: initialTransactionNsu || undefined, slug: initialSlug || undefined, receiptUrl: initialReceiptUrl || undefined, action: 'sync' }),
+      body: JSON.stringify({ bookingId: initialBooking, transactionNsu: initialTransactionNsu, slug: initialSlug, receiptUrl: initialReceiptUrl || undefined, action: 'sync' }),
     })
       .then(async (response) => ({ ok: response.ok, result: await response.json() as { error?: string } }))
       .then(({ ok, result }) => {
@@ -60,24 +64,32 @@ export default function BookingFlow({ initialMedia, initialServices: services, i
         setPaymentNotice(ok ? 'Pagamento conferido e reserva atualizada.' : (result.error || 'A confirmação automática ainda está sendo processada.'));
       })
       .catch(() => setPaymentNotice('A confirmação automática ainda está sendo processada.'));
-  }, [initialBooking, initialPayment, initialPaymentId, initialTransactionNsu, initialSlug, initialReceiptUrl]);
+  }, [initialBooking, initialPayment, initialTransactionNsu, initialSlug, initialReceiptUrl]);
 
   useEffect(() => {
-    if (!data.date) return;
+    if (!data.date || !data.service) return;
     let active = true;
     fetch(`/api/bookings/availability?date=${encodeURIComponent(data.date)}&service=${encodeURIComponent(data.service)}`)
-      .then((response) => response.ok ? response.json() : { unavailable: [] })
-      .then((result: { unavailable?: string[] }) => {
+      .then(async (response) => {
+        const result = await response.json() as { times?: string[]; unavailable?: string[]; closed?: boolean; error?: string };
+        if (!response.ok) throw new Error(result.error || 'Não foi possível consultar a agenda.');
+        return result;
+      })
+      .then((result) => {
         if (!active) return;
         const unavailable = result.unavailable || [];
+        setTimes(result.times || []);
         setUnavailableTimes(unavailable);
+        setAvailabilityClosed(Boolean(result.closed));
         setData((current) => unavailable.includes(current.time) ? { ...current, time: '' } : current);
-      });
+      })
+      .catch((requestError) => { if (active) { setTimes([]); setUnavailableTimes([]); setError(requestError instanceof Error ? requestError.message : 'Não foi possível consultar a agenda.'); } })
+      .finally(() => { if (active) setAvailabilityLoading(false); });
     return () => { active = false; };
   }, [data.date, data.service]);
 
   const selectedService = useMemo(() => services.find((service) => service.code === data.service), [data.service, services]);
-  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+  const calendarDays = useMemo(() => buildCalendarDays(calendarMonth, today, initialSchedule.openDays), [calendarMonth, today, initialSchedule.openDays]);
 
   function nextStep() {
     setError('');
@@ -102,7 +114,6 @@ export default function BookingFlow({ initialMedia, initialServices: services, i
       setBookingId(result.id || 'confirmado');
       setPaymentAmountCents(result.paymentAmountCents || 0);
       setPaymentUrl(result.paymentUrl || null);
-      setPaymentMode(result.paymentMode || '');
       setPaymentNotice(result.paymentError || '');
       setManageUrl(result.manageUrl || '');
       setStep(4);
@@ -149,7 +160,7 @@ export default function BookingFlow({ initialMedia, initialServices: services, i
                   <p className="service-group-title">Escolha uma opção</p>
                   <div className="service-options">
                     {services.filter((service) => service.group === activeGroup).map((service) => (
-                      <button type="button" key={service.code} className={`service-option ${data.service === service.code ? 'selected' : ''}`} onClick={() => setData({ ...data, service: service.code, date: '', time: '' })} aria-pressed={data.service === service.code}>
+                      <button type="button" key={service.code} className={`service-option ${data.service === service.code ? 'selected' : ''}`} onClick={() => { setTimes([]); setUnavailableTimes([]); setAvailabilityClosed(false); setAvailabilityLoading(false); setData({ ...data, service: service.code, date: '', time: '' }); }} aria-pressed={data.service === service.code}>
                         <div><h3>{service.name}</h3><p>{service.tagline} · {service.description}</p></div>
                         <strong>{money(service.priceCents)}</strong>
                       </button>
@@ -169,14 +180,29 @@ export default function BookingFlow({ initialMedia, initialServices: services, i
               {selectedService?.group === 'boss' && <p className="availability-note">O Pacote Boss acontece em estúdio e dura, em média, de 2 a 3 horas.</p>}
               <div className="form-grid">
                 <div className="form-field full">
-                  <label htmlFor="date">Data desejada</label>
-                  <input id="date" type="date" min={today} value={data.date} onChange={(event) => { setUnavailableTimes([]); setData({ ...data, date: event.target.value, time: '' }); }} required />
+                  <label>Data desejada</label>
+                  <div className="booking-calendar" aria-label="Calendário de agendamento">
+                    <div className="booking-calendar-head">
+                      <button type="button" aria-label="Mês anterior" disabled={calendarMonth <= `${today.slice(0, 7)}-01`} onClick={() => setCalendarMonth(shiftMonth(calendarMonth, -1))}><ChevronLeft size={16} /></button>
+                      <strong>{monthLabel(calendarMonth)}</strong>
+                      <button type="button" aria-label="Próximo mês" onClick={() => setCalendarMonth(shiftMonth(calendarMonth, 1))}><ChevronRight size={16} /></button>
+                    </div>
+                    <div className="booking-calendar-weekdays" aria-hidden="true">{['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day, index) => <span key={`${day}-${index}`}>{day}</span>)}</div>
+                    <div className="booking-calendar-grid">
+                      {calendarDays.map((day) => <button type="button" key={day.date} className={`${day.inMonth ? '' : 'outside'} ${data.date === day.date ? 'selected' : ''}`} disabled={day.disabled} aria-label={longCalendarDate(day.date)} aria-pressed={data.date === day.date} onClick={() => { setError(''); setTimes([]); setUnavailableTimes([]); setAvailabilityClosed(false); setAvailabilityLoading(true); setData({ ...data, date: day.date, time: '' }); }}>{day.day}</button>)}
+                    </div>
+                  </div>
+                  <small className="calendar-help">Dias sem atendimento ficam indisponíveis automaticamente.</small>
                 </div>
                 <div className="form-field full">
                   <label>Horário de preferência</label>
                   <div className="time-grid">
-                    {times.map((time) => <button type="button" key={time} disabled={unavailableTimes.includes(time)} className={`time-option ${data.time === time ? 'selected' : ''}`} onClick={() => setData({ ...data, time })}>{time}{unavailableTimes.includes(time) ? <small>ocupado</small> : null}</button>)}
+                    {times.map((time) => <button type="button" key={time} disabled={unavailableTimes.includes(time)} className={`time-option ${data.time === time ? 'selected' : ''}`} onClick={() => setData({ ...data, time })}>{time}{unavailableTimes.includes(time) ? <small>indisponível</small> : null}</button>)}
                   </div>
+                  {!data.date && <p className="availability-feedback">Escolha uma data para ver os horários.</p>}
+                  {availabilityLoading && <p className="availability-feedback">Consultando a agenda...</p>}
+                  {data.date && availabilityClosed && <p className="availability-feedback warning">Não há atendimento neste dia da semana.</p>}
+                  {data.date && !availabilityClosed && !availabilityLoading && times.length > 0 && times.every((time) => unavailableTimes.includes(time)) && <p className="availability-feedback warning">Não há mais horários disponíveis nesta data.</p>}
                 </div>
               </div>
             </div>
@@ -202,7 +228,7 @@ export default function BookingFlow({ initialMedia, initialServices: services, i
                 {selectedService?.priceCents === 0 && <div className="payment-summary full"><ShieldCheck size={20} /><div><strong>Valor sob consulta</strong><p>Após receber a solicitação, a equipe confirma orçamento e condições pelo WhatsApp.</p></div></div>}
                 <label className="booking-consent full"><input type="checkbox" checked={data.consent} onChange={(event) => setData({ ...data, consent: event.target.checked })} required /><span>Li e aceito os <Link href="/termos" target="_blank">termos do agendamento</Link> e a <Link href="/privacidade" target="_blank">política de privacidade</Link>.</span></label>
               </div>
-              <p className="demo-note">Solicitação: {selectedService?.name} · {data.date.split('-').reverse().join('/')} às {data.time}</p>
+              <p className="booking-note">Solicitação: {selectedService?.name} · {data.date.split('-').reverse().join('/')} às {data.time}</p>
             </div>
           )}
 
@@ -212,9 +238,8 @@ export default function BookingFlow({ initialMedia, initialServices: services, i
               <span className="booking-step-label">{returnStatus === 'success' ? (paymentConfirmed ? 'Pagamento recebido' : 'Conferindo pagamento') : returnStatus === 'pending' ? 'Pagamento em análise' : returnStatus === 'failure' ? 'Pagamento não concluído' : paymentUrl ? 'Horário pré-reservado por 30 minutos' : 'Solicitação recebida'}</span>
               <h2>{returnStatus === 'success' ? (paymentConfirmed ? <>Reserva<br />confirmada.</> : <>Estamos<br />confirmando.</>) : returnStatus === 'pending' ? <>Estamos<br />confirmando.</> : returnStatus === 'failure' ? <>Você pode<br />tentar novamente.</> : paymentUrl ? <>Falta apenas<br />o pagamento.</> : <>Seu momento<br />já começou.</>}</h2>
               {returnStatus === 'success' ? <p>{paymentConfirmed ? 'Pagamento conferido e reserva confirmada. Você receberá os detalhes pelo canal informado.' : (paymentNotice || 'Aguarde enquanto conferimos a transação diretamente com o provedor.')}</p> : returnStatus === 'pending' ? <p>O pagamento ainda está em análise. Assim que aprovar, a reserva será confirmada automaticamente.</p> : returnStatus === 'failure' ? <p>O pagamento não foi concluído. Acesse sua reserva abaixo para gerar uma nova tentativa enquanto o horário estiver disponível.</p> : paymentUrl ? <p>Para confirmar o horário, faça o pagamento de <strong>{money(paymentAmountCents)}</strong> em até 30 minutos.</p> : <p>{paymentNotice || 'Recebemos seu pedido. A equipe entrará em contato pelo WhatsApp para concluir os detalhes.'}</p>}
-              {paymentMode === 'demo' && paymentUrl && <p className="demo-payment-note">Demonstração: nenhuma cobrança real será feita.</p>}
-              <p className="demo-note">Código da solicitação: {bookingId}</p>
-              {paymentUrl && !returnStatus && <a className="button button-dark" href={paymentUrl}>{paymentMode === 'demo' ? 'Simular pagamento escolhido' : paymentMode === 'infinitepay' ? 'Pagar com InfinitePay' : 'Pagar com Mercado Pago'} <ArrowRight size={16} /></a>}
+              <p className="booking-note">Código da solicitação: {bookingId}</p>
+              {paymentUrl && !returnStatus && <a className="button button-dark" href={paymentUrl}>Pagar com InfinitePay <ArrowRight size={16} /></a>}
               {manageUrl && <Link className="button button-outline" href={manageUrl}>Gerenciar minha reserva <ArrowRight size={16} /></Link>}
               <Link className="button button-dark" href="/">Voltar ao início</Link>
             </div>
@@ -240,4 +265,32 @@ export default function BookingFlow({ initialMedia, initialServices: services, i
 
 function money(cents: number) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100);
+}
+
+function buildCalendarDays(month: string, today: string, openDays: number[]) {
+  const [year, monthNumber] = month.split('-').map(Number);
+  const first = new Date(Date.UTC(year, monthNumber - 1, 1));
+  const start = new Date(first);
+  start.setUTCDate(1 - first.getUTCDay());
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(start);
+    date.setUTCDate(start.getUTCDate() + index);
+    const iso = date.toISOString().slice(0, 10);
+    const inMonth = date.getUTCMonth() === monthNumber - 1;
+    return { date: iso, day: date.getUTCDate(), inMonth, disabled: !inMonth || iso < today || !openDays.includes(date.getUTCDay()) };
+  });
+}
+
+function shiftMonth(month: string, amount: number) {
+  const [year, monthNumber] = month.split('-').map(Number);
+  const date = new Date(Date.UTC(year, monthNumber - 1 + amount, 1));
+  return date.toISOString().slice(0, 10);
+}
+
+function monthLabel(month: string) {
+  return new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${month}T12:00:00Z`));
+}
+
+function longCalendarDate(date: string) {
+  return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'full', timeZone: 'UTC' }).format(new Date(`${date}T12:00:00Z`));
 }

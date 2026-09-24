@@ -8,7 +8,7 @@ import type { Booking } from '../../../../db/schema';
 import { getService } from '../../../../db/services';
 import { getAdminSession } from '../../../../lib/admin-auth';
 import { isSameOriginRequest } from '../../../../lib/request-security';
-import { BOOKABLE_SERVICE_CODES, BOOKING_TIMES } from '../../../../lib/service-catalog';
+import { BOOKABLE_SERVICE_CODES } from '../../../../lib/service-catalog';
 import { notifyBooking } from '../../../../lib/notifications';
 
 export async function GET() {
@@ -121,7 +121,7 @@ function validText(value: unknown, min: number, max: number, message: string) { 
 function optionalText(value: unknown, max: number) { const text = typeof value === 'string' ? value.trim() : ''; if (text.length > max) throw new Error('Texto acima do limite permitido.'); return text || null; }
 function validDate(value: unknown) { const date = typeof value === 'string' ? value : ''; if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T12:00:00Z`))) throw new Error('Data inválida.'); return date; }
 function validTime(value: unknown) { const time = typeof value === 'string' ? value : ''; if (!/^\d{2}:\d{2}$/.test(time)) throw new Error('Horário inválido.'); return time; }
-function validBookingTime(value: unknown) { const time = validTime(value)!; if (!BOOKING_TIMES.includes(time)) throw new Error('Horário fora da agenda.'); return time; }
+function validBookingTime(value: unknown) { return validTime(value)!; }
 function validServiceCode(value: unknown) { const service = typeof value === 'string' ? value : ''; if (!BOOKABLE_SERVICE_CODES.has(service)) throw new Error('Serviço inválido.'); return service; }
 function validMoney(value: unknown) { const amount = Number(value); if (!Number.isInteger(amount) || amount <= 0 || amount > 100000000) throw new Error('Valor inválido.'); return amount; }
 function validPhone(value: unknown) { const phone = validText(value, 10, 30, 'Informe um WhatsApp válido.'); const digits = phone.replace(/\D/g, ''); if (digits.length < 10 || digits.length > 13) throw new Error('Informe um WhatsApp válido.'); return phone; }

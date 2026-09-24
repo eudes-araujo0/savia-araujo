@@ -22,6 +22,7 @@ export type InfinitePayReference = {
 export async function createInfinitePayCheckout(booking: Booking, origin: string) {
   const handle = infinitePayHandle();
   if (!handle) throw new Error('INFINITEPAY_HANDLE não configurada.');
+  const siteOrigin = trustedSiteOrigin(origin);
   const query = new URLSearchParams({
     payment: 'success',
     booking: booking.id,
@@ -33,8 +34,8 @@ export async function createInfinitePayCheckout(booking: Booking, origin: string
     body: JSON.stringify({
       handle,
       order_nsu: booking.id,
-      redirect_url: `${origin}/agendar?${query.toString()}`,
-      webhook_url: `${origin}/api/infinitepay/webhook`,
+      redirect_url: `${siteOrigin}/agendar?${query.toString()}`,
+      webhook_url: `${siteOrigin}/api/infinitepay/webhook`,
       customer: {
         name: booking.clientName,
         email: booking.email || undefined,
@@ -50,7 +51,9 @@ export async function createInfinitePayCheckout(booking: Booking, origin: string
   });
   const result = await response.json().catch(() => ({})) as { url?: string; message?: string };
   if (!response.ok || !result.url) throw new Error(result.message || 'A InfinitePay não criou o link de pagamento.');
-  return { preferenceId: booking.id, paymentUrl: result.url };
+  const paymentUrl = safeCheckoutUrl(result.url);
+  if (!paymentUrl) throw new Error('A InfinitePay devolveu um endereço de pagamento inválido.');
+  return { preferenceId: booking.id, paymentUrl };
 }
 
 export async function checkInfinitePayPayment(reference: InfinitePayReference) {
@@ -80,7 +83,25 @@ export function assertInfinitePayPayment(booking: Booking, reference: InfinitePa
 }
 
 export function infinitePayHandle() {
-  return runtimeValue('INFINITEPAY_HANDLE').replace(/^\$/, '').trim();
+  const handle = runtimeValue('INFINITEPAY_HANDLE').replace(/^\$/, '').trim();
+  return /^[A-Za-z0-9._-]{2,80}$/.test(handle) ? handle : '';
+}
+
+function trustedSiteOrigin(value: string) {
+  const origin = new URL(value).origin;
+  if (process.env.NODE_ENV === 'production' && !origin.startsWith('https://')) {
+    throw new Error('NEXT_PUBLIC_SITE_URL deve usar HTTPS em produção.');
+  }
+  return origin;
+}
+
+function safeCheckoutUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && (url.hostname === 'checkout.infinitepay.com.br' || url.hostname.endsWith('.infinitepay.com.br')) ? url.toString() : '';
+  } catch {
+    return '';
+  }
 }
 
 function normalizePhone(value: string) {

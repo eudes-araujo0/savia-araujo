@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { assertBookingAvailability, cancelManagedBooking, getManagedBooking, pendingExpiry, renewPendingBooking, updateBookingDetails, updatePaymentPreference } from '../../../../db/bookings';
-import { createPaymentCheckout } from '../../../../lib/mercado-pago';
+import { createPaymentCheckout } from '../../../../lib/payments';
 import { notifyBooking } from '../../../../lib/notifications';
 import { isSameOriginRequest } from '../../../../lib/request-security';
 import { runtimeValue } from '../../../../lib/runtime-env';
-import { BOOKING_TIMES } from '../../../../lib/service-catalog';
+import { isValidIsoDate, todayInSaoPaulo } from '../../../../lib/business-hours';
 
 type ManageBody = { id?: string; token?: string; action?: 'cancel' | 'reschedule' | 'retry-payment'; date?: string; time?: string };
 
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     if (body.action === 'reschedule') {
       const date = body.date?.trim() || '';
       const time = body.time?.trim() || '';
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < todayInSaoPaulo() || !BOOKING_TIMES.includes(time)) return NextResponse.json({ error: 'Data ou horário inválido.' }, { status: 400 });
+      if (!isValidIsoDate(date) || date < todayInSaoPaulo() || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return NextResponse.json({ error: 'Data ou horário inválido.' }, { status: 400 });
       if (booking.status === 'cancelado') return NextResponse.json({ error: 'Uma reserva cancelada não pode ser reagendada por este link.' }, { status: 409 });
       if (booking.status === 'expirado') return NextResponse.json({ error: 'A pré-reserva expirou. Primeiro verifique o horário e gere um novo pagamento.' }, { status: 409 });
       if (hoursUntil(booking.appointmentDate, booking.appointmentTime) < 48) return NextResponse.json({ error: 'Para alterações com menos de 48 horas, fale diretamente com Sávia pelo WhatsApp.' }, { status: 409 });
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
     await assertBookingAvailability(booking.appointmentDate, booking.appointmentTime, booking.service, booking.id, booking.durationMinutes);
     const expiresAt = pendingExpiry();
     await renewPendingBooking(id, expiresAt);
-    const checkout = await createPaymentCheckout({ ...booking, status: 'pendente', paymentStatus: 'aguardando', expiresAt }, publicOrigin(request), token);
+    const checkout = await createPaymentCheckout({ ...booking, status: 'pendente', paymentStatus: 'aguardando', expiresAt }, publicOrigin(request));
     await updatePaymentPreference(id, checkout.mode, checkout.preferenceId, checkout.paymentUrl);
     if (!checkout.paymentUrl) return NextResponse.json({ error: 'O pagamento está temporariamente indisponível.' }, { status: 503 });
     const response = NextResponse.json({ ok: true, paymentUrl: checkout.paymentUrl });
@@ -63,10 +63,6 @@ function publicBooking(booking: Awaited<ReturnType<typeof getManagedBooking>> & 
 function publicOrigin(request: Request) {
   const configured = runtimeValue('NEXT_PUBLIC_SITE_URL');
   try { return configured ? new URL(configured).origin : new URL(request.url).origin; } catch { return new URL(request.url).origin; }
-}
-
-function todayInSaoPaulo() {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 }
 
 function hoursUntil(date: string, time: string) {

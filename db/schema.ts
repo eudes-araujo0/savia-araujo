@@ -48,3 +48,11 @@ export type Expense = {
   amountCents: number;
   createdAt: number;
 };
+
+export type BusinessSchedule = {
+  openDays: number[];
+  startTime: string;
+  endTime: string;
+  slotIntervalMinutes: number;
+  updatedAt: number | null;
+};
