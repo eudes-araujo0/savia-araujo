@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { listBookings, listExpenses, listScheduleBlocks } from '../../db/bookings';
 import { listSiteMedia } from '../../db/media';
+import { listServices } from '../../db/services';
 import { requireAdminSession } from '../../lib/admin-auth';
 import AdminDashboard from './admin-dashboard';
 
@@ -13,11 +14,12 @@ export const metadata: Metadata = {
 
 export default async function AdminPage() {
   const session = await requireAdminSession('/admin');
-  const [bookings, expenses, blocks, initialMedia] = await Promise.all([
+  const [bookings, expenses, blocks, initialMedia, initialServices] = await Promise.all([
     listBookings(),
     listExpenses(),
     listScheduleBlocks(),
     listSiteMedia().catch(() => []),
+    listServices(true),
   ]);
 
   return (
@@ -26,6 +28,7 @@ export default async function AdminPage() {
       initialExpenses={expenses}
       initialBlocks={blocks}
       initialMedia={initialMedia}
+      initialServices={initialServices}
       username={session.username}
       signOutPath="/api/admin/session"
     />

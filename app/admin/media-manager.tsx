@@ -46,6 +46,10 @@ export default function MediaManager() {
 
   const sections = useMemo(() => ['Todas', ...Array.from(new Set(items.map((item) => item.section)))], [items]);
   const visible = useMemo(() => section === 'Todas' ? items : items.filter((item) => item.section === section), [items, section]);
+  const groups = useMemo(() => sections.filter((value) => value !== 'Todas').map((value) => ({
+    section: value,
+    items: visible.filter((item) => item.section === value),
+  })).filter((group) => group.items.length > 0), [sections, visible]);
 
   function openEditor(item: SiteMediaLibraryItem) {
     setFeedback(null);
@@ -155,19 +159,24 @@ export default function MediaManager() {
       <p>Troque qualquer foto sem mexer no código. Ajuste o ponto focal e o zoom separadamente para computador e celular antes de publicar.</p>
     </section>
     {feedback && <p className={`admin-feedback ${feedback.kind}`}>{feedback.text}</p>}
-    <div className="media-section-tabs" role="tablist" aria-label="Filtrar áreas do site">
-      {sections.map((value) => <button key={value} className={section === value ? 'active' : ''} onClick={() => setSection(value)}>{value}</button>)}
+    <div className="media-section-tabs media-section-directory" role="tablist" aria-label="Filtrar áreas do site">
+      {sections.map((value) => <button key={value} className={section === value ? 'active' : ''} onClick={() => setSection(value)}><span>{value}</span><small>{value === 'Todas' ? items.length : items.filter((item) => item.section === value).length} fotos</small></button>)}
     </div>
     {loading ? <div className="media-loading"><LoaderCircle className="spinning" /> Carregando imagens…</div> :
-      <section className="media-library-grid">
-        {visible.map((item) => <article className="media-library-card" key={item.id}>
-          <button className="media-card-preview" onClick={() => openEditor(item)} aria-label={`Editar ${item.label}`}>
-            <Image src={item.current.url} alt={item.current.alt} fill sizes="(max-width: 760px) 100vw, 30vw" style={{ objectPosition: `${item.current.desktopX}% ${item.current.desktopY}%`, transform: `scale(${item.current.desktopZoom})` }} />
-            <span><Move size={14} /> Ajustar foto</span>
-          </button>
-          <div className="media-card-copy"><small>{item.section} · {item.aspect}</small><h3>{item.label}</h3><p>{item.description}</p><button onClick={() => openEditor(item)}>Trocar ou enquadrar <ImagePlus size={14} /></button></div>
-        </article>)}
-      </section>}
+      <div className="media-library-sections">
+        {groups.map((group) => <section className="media-library-section" key={group.section}>
+          <header><div><small>Área do site</small><h3>{group.section}</h3><p>{sectionDescription(group.section)}</p></div><span>{group.items.length} {group.items.length === 1 ? 'imagem' : 'imagens'}</span></header>
+          <div className="media-library-grid">
+            {group.items.map((item) => <article className="media-library-card" key={item.id}>
+              <button className="media-card-preview" onClick={() => openEditor(item)} aria-label={`Editar ${item.label}`}>
+                <Image src={item.current.url} alt={item.current.alt} fill sizes="(max-width: 760px) 100vw, 30vw" style={{ objectPosition: `${item.current.desktopX}% ${item.current.desktopY}%`, transform: `scale(${item.current.desktopZoom})` }} />
+                <span><Move size={14} /> Ajustar foto</span>
+              </button>
+              <div className="media-card-copy"><small>{item.aspect} · {item.id}</small><h3>{item.label}</h3><p>{item.description}</p><button onClick={() => openEditor(item)}>Trocar ou enquadrar <ImagePlus size={14} /></button></div>
+            </article>)}
+          </div>
+        </section>)}
+      </div>}
 
     {editor && <div className="admin-modal-backdrop media-editor-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) closeEditor(); }}>
       <section className="media-editor" role="dialog" aria-modal="true" aria-labelledby="media-editor-title">
@@ -203,6 +212,15 @@ export default function MediaManager() {
 }
 
 function clamp(value: number, min: number, max: number) { return Math.min(max, Math.max(min, value)); }
+function sectionDescription(section: string) {
+  return ({
+    'Página inicial': 'Capa, apresentação da artista, manifesto e chamada final.',
+    Portfólio: 'Galeria “Cada imagem, uma presença” e versões próprias para celular.',
+    Experiências: 'Destaques visuais do Dia da Noiva e do Pacote Boss.',
+    Agendamento: 'Imagem de abertura usada durante a escolha do serviço e horário.',
+    Painel: 'Fotos exclusivas da entrada e do perfil administrativo.',
+  } as Record<string, string>)[section] || 'Imagens desta área do site.';
+}
 function safeFilename(value: string) {
   const extension = value.toLowerCase().match(/\.(jpe?g|png|webp|avif)$/)?.[0] || '.jpg';
   const name = value.replace(/\.[^.]+$/, '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9-]+/gi, '-').replace(/^-|-$/g, '').slice(0, 60) || 'imagem';

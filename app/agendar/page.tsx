@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import BookingFlow from './booking-flow';
 import { listPublicSiteMedia } from '../../db/media';
+import { listServices } from '../../db/services';
+import { BOOKABLE_SERVICES } from '../../lib/service-catalog';
 
 export const metadata: Metadata = {
   title: 'Agendar horário | Sávia Araújo',
@@ -13,6 +15,9 @@ export default async function BookingPage({ searchParams }: { searchParams: Prom
   const stored = (await cookies()).get('savia_manage')?.value || '';
   const [storedBooking, storedToken] = stored.split('.', 2);
   const initialToken = params.token || (params.booking && storedBooking === params.booking ? storedToken : '') || '';
-  const initialMedia = await listPublicSiteMedia().catch(() => []);
-  return <BookingFlow initialMedia={initialMedia} initialService={params.service || ''} initialPayment={params.payment || ''} initialBooking={params.booking || ''} initialToken={initialToken} initialPaymentId={params.payment_id || params.collection_id || ''} initialTransactionNsu={params.transaction_nsu || ''} initialSlug={params.slug || ''} initialReceiptUrl={params.receipt_url || ''} />;
+  const [initialMedia, initialServices] = await Promise.all([
+    listPublicSiteMedia().catch(() => []),
+    listServices().catch(() => BOOKABLE_SERVICES),
+  ]);
+  return <BookingFlow initialMedia={initialMedia} initialServices={initialServices} initialService={params.service || ''} initialPayment={params.payment || ''} initialBooking={params.booking || ''} initialToken={initialToken} initialPaymentId={params.payment_id || params.collection_id || ''} initialTransactionNsu={params.transaction_nsu || ''} initialSlug={params.slug || ''} initialReceiptUrl={params.receipt_url || ''} />;
 }

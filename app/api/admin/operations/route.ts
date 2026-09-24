@@ -5,9 +5,10 @@ import {
   setManagementToken, updateBookingDetails,
 } from '../../../../db/bookings';
 import type { Booking } from '../../../../db/schema';
+import { getService } from '../../../../db/services';
 import { getAdminSession } from '../../../../lib/admin-auth';
 import { isSameOriginRequest } from '../../../../lib/request-security';
-import { BOOKING_TIMES, SERVICE_CATALOG } from '../../../../lib/service-catalog';
+import { BOOKABLE_SERVICE_CODES, BOOKING_TIMES } from '../../../../lib/service-catalog';
 import { notifyBooking } from '../../../../lib/notifications';
 
 export async function GET() {
@@ -40,11 +41,12 @@ export async function POST(request: Request) {
     }
     if (body.action === 'create-booking') {
       assertKeys(body, ['action', 'clientName', 'whatsapp', 'email', 'service', 'date', 'time', 'paymentOption', 'paid', 'notes']);
-      const service = validService(body.service);
-      const catalog = SERVICE_CATALOG[service];
+      const service = validServiceCode(body.service);
+      const catalog = await getService(service);
+      if (!catalog) throw new Error('Este serviço está indisponível.');
       const date = validDate(body.date);
       const time = validBookingTime(body.time);
-      await assertBookingAvailability(date, time, service);
+      await assertBookingAvailability(date, time, service, '', catalog.durationMinutes);
       const paymentOption = body.paymentOption === 'full' ? 'full' : 'deposit';
       const paymentAmountCents = paymentOption === 'full' ? catalog.priceCents : Math.round(catalog.priceCents * .5);
       const paid = body.paid === true;
@@ -52,7 +54,7 @@ export async function POST(request: Request) {
       const id = `SAV-${date.replaceAll('-', '')}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
       const booking: Booking = {
         id, createdAt: now, clientName: validText(body.clientName, 2, 120, 'Informe o nome da cliente.'), whatsapp: validPhone(body.whatsapp), email: optionalEmail(body.email),
-        service, serviceLabel: catalog.label, appointmentDate: date, appointmentTime: time, durationMinutes: catalog.durationMinutes,
+        service, serviceLabel: catalog.name, appointmentDate: date, appointmentTime: time, durationMinutes: catalog.durationMinutes,
         priceCents: catalog.priceCents, depositCents: Math.round(catalog.priceCents * .5), balanceCents: catalog.priceCents - (paid ? paymentAmountCents : 0), paymentOption, paymentAmountCents,
         balancePaidCents: 0, status: paid ? 'confirmado' : 'pendente', paymentStatus: paid ? 'pago' : 'aguardando', paymentProvider: 'manual', paymentPreferenceId: null, paymentId: paid ? `MANUAL-${now}` : null, paymentUrl: null,
         paidAt: paid ? now : null, balancePaidAt: null, expiresAt: null, consentAt: now, notes: optionalText(body.notes, 1200), receiptKey: null, receiptName: null, paymentReceiptUrl: null,
@@ -77,7 +79,7 @@ export async function PATCH(request: Request) {
     const id = validBookingId(body.id);
     if (body.action === 'update-booking') {
       assertKeys(body, ['action', 'id', 'clientName', 'whatsapp', 'email', 'service', 'date', 'time', 'notes']);
-      await updateBookingDetails(id, { clientName: validText(body.clientName, 2, 120, 'Informe o nome.'), whatsapp: validPhone(body.whatsapp), email: optionalEmail(body.email), service: validService(body.service), appointmentDate: validDate(body.date), appointmentTime: validBookingTime(body.time), notes: optionalText(body.notes, 1200) });
+      await updateBookingDetails(id, { clientName: validText(body.clientName, 2, 120, 'Informe o nome.'), whatsapp: validPhone(body.whatsapp), email: optionalEmail(body.email), service: validServiceCode(body.service), appointmentDate: validDate(body.date), appointmentTime: validBookingTime(body.time), notes: optionalText(body.notes, 1200) });
       return NextResponse.json({ ok: true });
     }
     if (body.action === 'receive-balance') {
@@ -120,7 +122,7 @@ function optionalText(value: unknown, max: number) { const text = typeof value =
 function validDate(value: unknown) { const date = typeof value === 'string' ? value : ''; if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T12:00:00Z`))) throw new Error('Data inválida.'); return date; }
 function validTime(value: unknown) { const time = typeof value === 'string' ? value : ''; if (!/^\d{2}:\d{2}$/.test(time)) throw new Error('Horário inválido.'); return time; }
 function validBookingTime(value: unknown) { const time = validTime(value)!; if (!BOOKING_TIMES.includes(time)) throw new Error('Horário fora da agenda.'); return time; }
-function validService(value: unknown) { const service = typeof value === 'string' ? value : ''; if (!SERVICE_CATALOG[service]) throw new Error('Serviço inválido.'); return service; }
+function validServiceCode(value: unknown) { const service = typeof value === 'string' ? value : ''; if (!BOOKABLE_SERVICE_CODES.has(service)) throw new Error('Serviço inválido.'); return service; }
 function validMoney(value: unknown) { const amount = Number(value); if (!Number.isInteger(amount) || amount <= 0 || amount > 100000000) throw new Error('Valor inválido.'); return amount; }
 function validPhone(value: unknown) { const phone = validText(value, 10, 30, 'Informe um WhatsApp válido.'); const digits = phone.replace(/\D/g, ''); if (digits.length < 10 || digits.length > 13) throw new Error('Informe um WhatsApp válido.'); return phone; }
 function optionalEmail(value: unknown) { const email = typeof value === 'string' ? value.trim() : ''; if (email && (email.length > 160 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) throw new Error('E-mail inválido.'); return email || null; }

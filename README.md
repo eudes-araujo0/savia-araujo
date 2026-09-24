@@ -21,6 +21,7 @@ Projeto completo em Next.js para publicar na Vercel, com serviços de maquiagem,
 - criptografia AES-GCM dos dados pessoais e rate limit persistente no login e no agendamento;
 - RLS ativo no PostgreSQL e acesso administrativo exclusivo da conta master;
 - biblioteca visual master para trocar todas as fotos, ajustar foco, altura e zoom separadamente no computador e celular, com histórico de versões;
+- catálogo administrativo para editar nomes, descrições, itens inclusos, valores, duração e disponibilidade dos serviços;
 - criação automática das tabelas no primeiro acesso ao banco.
 
 ## 1. Preparar o projeto localmente
@@ -104,6 +105,10 @@ Para Sávia trocar as fotos pelo painel:
 5. entre em **Painel > Imagens do site**, escolha uma área, envie a foto, confira as abas Computador e Celular, arraste o ponto focal, ajuste o zoom e publique.
 
 Somente a sessão master recebe autorização temporária de upload. Os arquivos aceitos são JPG, PNG, WebP e AVIF, até 50 MB, preservados sem recompressão. Cada publicação preserva uma versão anterior para restauração. Os arquivos do Blob são públicos porque aparecem no site; dados pessoais e comprovantes continuam fora dessa biblioteca.
+
+### Serviços, descrições e valores
+
+Em **Painel > Serviços e valores**, a proprietária pode editar cada experiência ou ocultá-la temporariamente. A publicação atualiza a página inicial e o formulário de agendamento. Na criação da reserva, o servidor consulta novamente o catálogo salvo no Neon e calcula o sinal de 50% ou o pagamento integral; nenhum valor enviado pelo navegador é aceito. Reservas já criadas preservam o preço contratado no momento do agendamento.
 
 ### Ativar os e-mails do Resend
 

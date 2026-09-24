@@ -1,19 +1,14 @@
-import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 import type { Booking, Expense, ScheduleBlock } from './schema';
 import { decryptSensitive, encryptSensitive } from '../lib/data-crypto';
-import { BOOKING_TIMES, isBridalService, SERVICE_CATALOG } from '../lib/service-catalog';
+import { BOOKING_TIMES, isBridalService } from '../lib/service-catalog';
+import { getService } from './services';
+import { database } from './client';
 
-let client: NeonQueryFunction<false, false> | null = null;
+export { database } from './client';
+
 let initialized: Promise<void> | null = null;
 
 const PENDING_TTL_MS = 30 * 60 * 1000;
-
-export function database() {
-  const connectionString = process.env.DATABASE_URL?.trim();
-  if (!connectionString) throw new Error('DATABASE_URL não configurada.');
-  if (!client) client = neon(connectionString);
-  return client;
-}
 
 export async function ensureBookingsSchema() {
   if (initialized) return initialized;
@@ -200,7 +195,7 @@ export async function getBooking(id: string): Promise<Booking | null> {
   return rows[0] ? await mapBooking(rows[0] as Record<string, unknown>) : null;
 }
 
-export async function listUnavailableTimes(appointmentDate: string, requestedService = ''): Promise<string[]> {
+export async function listUnavailableTimes(appointmentDate: string, requestedService = '', requestedDuration?: number): Promise<string[]> {
   await ensureBookingsSchema();
   await expireStaleBookings();
   const sql = database();
@@ -209,17 +204,17 @@ export async function listUnavailableTimes(appointmentDate: string, requestedSer
   if (blocks.some((block) => !block.start_time || !block.end_time) || (isBridalService(requestedService) && rows.length > 0) || rows.some((row) => isBridalService(String(row.service)))) {
     return BOOKING_TIMES;
   }
-  const requestedDuration = serviceDuration(requestedService);
+  const duration = requestedDuration || (await getService(requestedService, true))?.durationMinutes || 90;
   return BOOKING_TIMES.filter((time) => {
     const start = timeToMinutes(time);
-    const end = start + requestedDuration;
+    const end = start + duration;
     const bookingCollision = rows.some((row) => rangesOverlap(start, end, timeToMinutes(String(row.appointment_time)), timeToMinutes(String(row.appointment_time)) + Number(row.duration_minutes || 90)));
     const blockCollision = blocks.some((block) => rangesOverlap(start, end, timeToMinutes(String(block.start_time)), timeToMinutes(String(block.end_time))));
     return bookingCollision || blockCollision;
   });
 }
 
-export async function assertBookingAvailability(appointmentDate: string, appointmentTime: string, requestedService: string, excludeId = '') {
+export async function assertBookingAvailability(appointmentDate: string, appointmentTime: string, requestedService: string, excludeId = '', requestedDuration?: number) {
   await ensureBookingsSchema();
   await expireStaleBookings();
   const sql = database();
@@ -233,7 +228,8 @@ export async function assertBookingAvailability(appointmentDate: string, appoint
     throw new Error('Esta data está reservada com exclusividade para uma noiva.');
   }
   const start = timeToMinutes(appointmentTime);
-  const end = start + serviceDuration(requestedService);
+  const duration = requestedDuration || (await getService(requestedService, true))?.durationMinutes || 90;
+  const end = start + duration;
   if (rows.some((row) => rangesOverlap(start, end, timeToMinutes(String(row.appointment_time)), timeToMinutes(String(row.appointment_time)) + Number(row.duration_minutes || 90)))) {
     throw new Error('Este horário está indisponível. Escolha outro horário.');
   }
@@ -356,15 +352,15 @@ export async function deleteExpense(id: string) {
 
 export async function updateBookingDetails(id: string, input: { clientName: string; whatsapp: string; email: string | null; service: string; appointmentDate: string; appointmentTime: string; notes: string | null }) {
   await ensureBookingsSchema();
-  const catalog = SERVICE_CATALOG[input.service];
+  const catalog = await getService(input.service, true);
   if (!catalog) throw new Error('Serviço inválido.');
-  await assertBookingAvailability(input.appointmentDate, input.appointmentTime, input.service, id);
+  await assertBookingAvailability(input.appointmentDate, input.appointmentTime, input.service, id, catalog.durationMinutes);
   const [clientName, whatsapp, email, notes] = await Promise.all([encryptSensitive(input.clientName), encryptSensitive(input.whatsapp), encryptSensitive(input.email), encryptSensitive(input.notes)]);
   const priceCents = catalog.priceCents;
   const current = await getBooking(id);
   if (!current) throw new Error('Agendamento não encontrado.');
   const paymentAmountCents = current.paymentStatus === 'pago' ? current.paymentAmountCents : Math.round(priceCents * (current.paymentOption === 'full' ? 1 : .5));
-  await database()`UPDATE bookings SET client_name = ${clientName}, whatsapp = ${whatsapp}, email = ${email}, service = ${input.service}, service_label = ${catalog.label}, appointment_date = ${input.appointmentDate}, appointment_time = ${input.appointmentTime}, duration_minutes = ${catalog.durationMinutes}, price_cents = ${priceCents}, deposit_cents = ${Math.round(priceCents * .5)}, balance_cents = ${Math.max(0, priceCents - paymentAmountCents)}, payment_amount_cents = ${paymentAmountCents}, notes = ${notes} WHERE id = ${id}`;
+  await database()`UPDATE bookings SET client_name = ${clientName}, whatsapp = ${whatsapp}, email = ${email}, service = ${input.service}, service_label = ${catalog.name}, appointment_date = ${input.appointmentDate}, appointment_time = ${input.appointmentTime}, duration_minutes = ${catalog.durationMinutes}, price_cents = ${priceCents}, deposit_cents = ${Math.round(priceCents * .5)}, balance_cents = ${Math.max(0, priceCents - paymentAmountCents)}, payment_amount_cents = ${paymentAmountCents}, notes = ${notes} WHERE id = ${id}`;
 }
 
 export async function markBalanceReceived(id: string, amountCents: number) {
@@ -435,10 +431,6 @@ function safeEqual(left: string, right: string) {
   let difference = 0;
   for (let index = 0; index < left.length; index += 1) difference |= left.charCodeAt(index) ^ right.charCodeAt(index);
   return difference === 0;
-}
-
-function serviceDuration(service: string) {
-  return SERVICE_CATALOG[service]?.durationMinutes || 90;
 }
 
 function timeToMinutes(value: string) {

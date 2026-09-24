@@ -164,6 +164,42 @@ BEGIN
 END
 $$;
 
+CREATE TABLE IF NOT EXISTS service_catalog (
+  code TEXT PRIMARY KEY,
+  service_group TEXT NOT NULL,
+  group_label TEXT NOT NULL,
+  name TEXT NOT NULL,
+  tagline TEXT NOT NULL,
+  description TEXT NOT NULL,
+  features TEXT NOT NULL DEFAULT '[]',
+  price_cents INTEGER NOT NULL,
+  duration_minutes INTEGER NOT NULL,
+  active BOOLEAN NOT NULL DEFAULT TRUE,
+  sort_order INTEGER NOT NULL,
+  updated_at BIGINT NOT NULL
+);
+
+ALTER TABLE service_catalog ENABLE ROW LEVEL SECURITY;
+ALTER TABLE service_catalog FORCE ROW LEVEL SECURITY;
+REVOKE ALL ON service_catalog FROM PUBLIC;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = current_schema()
+      AND tablename = 'service_catalog'
+      AND policyname = 'service_catalog_backend_only'
+  ) THEN
+    CREATE POLICY service_catalog_backend_only
+      ON service_catalog
+      TO CURRENT_USER
+      USING (true)
+      WITH CHECK (true);
+  END IF;
+END
+$$;
+
 CREATE TABLE IF NOT EXISTS site_media (
   slot_id TEXT PRIMARY KEY,
   url TEXT NOT NULL,

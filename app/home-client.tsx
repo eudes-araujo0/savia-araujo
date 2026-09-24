@@ -7,6 +7,7 @@ import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useSiteMedia } from '../lib/use-site-media';
 import { managedMediaStyle, type SiteMediaValue } from '../lib/site-media';
+import type { BookableService } from '../lib/service-catalog';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -144,67 +145,13 @@ const portfolio: PortfolioItem[] = [
   },
 ];
 
-const makeupServices = [
-  {
-    number: '01',
-    title: 'Make Express',
-    subtitle: 'Leve & essencial',
-    description: 'Maquiagem natural para uma produção rápida e elegante. Não inclui cílios.',
-    price: 'R$ 90',
-    code: 'make-express',
-  },
-  {
-    number: '02',
-    title: 'Make Social',
-    subtitle: 'Para ser lembrada',
-    description: 'Produção elaborada para festas, fotos e eventos, com acabamento pensado para durar.',
-    price: 'R$ 120',
-    code: 'make-social',
-  },
-  {
-    number: '03',
-    title: 'Make & Hair',
-    subtitle: 'Produção completa',
-    description: 'Maquiagem e babyliss em uma experiência completa, do primeiro pincel ao acabamento final.',
-    price: 'R$ 180',
-    code: 'make-hair',
-  },
-];
-
-const bridalPackages = [
-  {
-    name: 'Rubi',
-    price: 'R$ 500',
-    code: 'noiva-rubi',
-    description: 'O essencial do grande dia, com preparação cuidadosa e testes prévios.',
-    features: ['Teste de maquiagem', 'Teste de penteado', 'Skin care + massagem facial', 'Assessoria de véu, acessórios e vestido'],
-  },
-  {
-    name: 'Ouro',
-    price: 'R$ 700',
-    code: 'noiva-ouro',
-    description: 'Uma experiência mais completa, com cuidado, celebração e atenção aos detalhes.',
-    features: ['Testes de maquiagem e penteado', 'Assessoria completa', 'Massagem facial e corporal', 'Mimo, robe e momento do brinde'],
-  },
-  {
-    name: 'Master',
-    price: 'R$ 900',
-    code: 'noiva-master',
-    description: 'O ritual completo para viver o dia com tranquilidade, presença e exclusividade.',
-    features: ['Maquiagem e penteado + testes', 'Coffee break e massagem relaxante', 'Mimo e robe personalizado', 'Kit retoque e taças para o brinde'],
-  },
-];
-
-const bossPackages = [
-  { photos: '10 fotos', looks: 'até 2 looks', price: 'R$ 300', code: 'boss-10' },
-  { photos: '15 fotos', looks: 'até 2 looks', price: 'R$ 400', code: 'boss-15' },
-  { photos: '20 fotos', looks: 'até 3 looks', price: 'R$ 500', code: 'boss-20' },
-];
-
-export default function HomeClient({ initialMedia }: { initialMedia: SiteMediaValue[] }) {
+export default function HomeClient({ initialMedia, initialServices }: { initialMedia: SiteMediaValue[]; initialServices: BookableService[] }) {
   const scope = useRef<HTMLElement>(null);
   const [filter, setFilter] = useState('todos');
   const getMedia = useSiteMedia(initialMedia);
+  const makeupServices = initialServices.filter((service) => service.group === 'makeup');
+  const bridalPackages = initialServices.filter((service) => service.group === 'noivas');
+  const bossPackages = initialServices.filter((service) => service.group === 'boss');
 
   useLayoutEffect(() => {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -326,13 +273,13 @@ export default function HomeClient({ initialMedia }: { initialMedia: SiteMediaVa
           <h2>Seu momento,<br />do essencial ao <em>completo.</em></h2>
         </div>
         <div className="services-list">
-          {makeupServices.map((service) => (
+          {makeupServices.map((service, index) => (
             <article className="service-row" key={service.code} data-reveal>
-              <span className="service-number">{service.number}</span>
-              <div className="service-name"><p>{service.subtitle}</p><h3>{service.title}</h3></div>
+              <span className="service-number">{String(index + 1).padStart(2, '0')}</span>
+              <div className="service-name"><p>{service.tagline}</p><h3>{service.name}</h3></div>
               <p className="service-description">{service.description}</p>
-              <div className="service-price"><small>investimento</small><strong>{service.price}</strong></div>
-              <a href={`/agendar?service=${service.code}`} aria-label={`Agendar ${service.title}`}><ArrowUpRight size={23} /></a>
+              <div className="service-price"><small>investimento</small><strong>{money(service.priceCents)}</strong></div>
+              <a href={`/agendar?service=${service.code}`} aria-label={`Agendar ${service.name}`}><ArrowUpRight size={23} /></a>
             </article>
           ))}
         </div>
@@ -359,10 +306,10 @@ export default function HomeClient({ initialMedia }: { initialMedia: SiteMediaVa
           {bridalPackages.map((item, index) => (
             <article className={`package-card ${index === 2 ? 'featured' : ''}`} key={item.name} data-reveal>
               <div className="package-card-head"><span>0{index + 1}</span>{index === 2 && <small>Experiência completa</small>}</div>
-              <h3>Noiva <em>{item.name}</em></h3>
+              <h3>{item.name}</h3>
               <p>{item.description}</p>
               <ul>{item.features.map((feature) => <li key={feature}><Check size={13} /> {feature}</li>)}</ul>
-              <div className="package-card-footer"><strong>{item.price}</strong><a href={`/agendar?service=${item.code}`}>Reservar <ArrowUpRight size={16} /></a></div>
+              <div className="package-card-footer"><strong>{money(item.priceCents)}</strong><a href={`/agendar?service=${item.code}`}>Reservar <ArrowUpRight size={16} /></a></div>
             </article>
           ))}
         </div>
@@ -387,9 +334,9 @@ export default function HomeClient({ initialMedia }: { initialMedia: SiteMediaVa
           <div className="boss-packages">
             {bossPackages.map((item) => (
               <article key={item.code}>
-                <div><h3>{item.photos}</h3><small>Maquiagem + babyliss · {item.looks}</small></div>
-                <strong>{item.price}</strong>
-                <a href={`/agendar?service=${item.code}`} aria-label={`Reservar Pacote Boss com ${item.photos}`}><ArrowUpRight size={18} /></a>
+                <div><h3>{item.name}</h3><small>{item.description} · {item.tagline}</small></div>
+                <strong>{money(item.priceCents)}</strong>
+                <a href={`/agendar?service=${item.code}`} aria-label={`Reservar Pacote Boss ${item.name}`}><ArrowUpRight size={18} /></a>
               </article>
             ))}
           </div>
@@ -438,3 +385,5 @@ export default function HomeClient({ initialMedia }: { initialMedia: SiteMediaVa
     </main>
   );
 }
+
+function money(cents: number) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(cents / 100); }

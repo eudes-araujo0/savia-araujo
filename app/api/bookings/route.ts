@@ -4,10 +4,11 @@ import { createPaymentCheckout } from '../../../lib/mercado-pago';
 import { assertBookingAvailability, createBooking, listBookings, pendingExpiry, setManagementToken, updateBookingStatus, updatePaymentPreference } from '../../../db/bookings';
 import type { Booking } from '../../../db/schema';
 import { isSameOriginRequest, requestFingerprint } from '../../../lib/request-security';
-import { BOOKING_TIMES, SERVICE_CATALOG } from '../../../lib/service-catalog';
+import { BOOKING_TIMES } from '../../../lib/service-catalog';
 import { notifyBooking } from '../../../lib/notifications';
 import { runtimeValue } from '../../../lib/runtime-env';
 import { checkBookingRateLimit, recordBookingAttempt } from '../../../db/security';
+import { getService } from '../../../db/services';
 
 const allowedTimes = new Set(BOOKING_TIMES);
 
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
     const appointmentDate = text(form, 'date');
     const appointmentTime = text(form, 'time');
     const consent = text(form, 'consent');
-    const catalogItem = SERVICE_CATALOG[service];
+    const catalogItem = await getService(service);
 
     if (!catalogItem || !clientName || !whatsapp || !email || !appointmentDate || !appointmentTime || consent !== 'accepted') {
       return NextResponse.json({ error: 'Preencha os dados obrigatórios do agendamento.' }, { status: 400 });
@@ -66,7 +67,7 @@ export async function POST(request: Request) {
       whatsapp: whatsapp.slice(0, 30),
       email,
       service,
-      serviceLabel: catalogItem.label,
+      serviceLabel: catalogItem.name,
       appointmentDate,
       appointmentTime,
       durationMinutes: catalogItem.durationMinutes,
@@ -93,7 +94,7 @@ export async function POST(request: Request) {
     };
 
     try {
-      await assertBookingAvailability(appointmentDate, appointmentTime, service);
+      await assertBookingAvailability(appointmentDate, appointmentTime, service, '', catalogItem.durationMinutes);
       await createBooking(booking);
       await setManagementToken(id, managementToken);
     } catch (databaseError) {

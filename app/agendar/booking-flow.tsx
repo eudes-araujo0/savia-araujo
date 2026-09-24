@@ -4,11 +4,10 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Check, CreditCard, ShieldCheck } from 'lucide-react';
-import { BOOKABLE_SERVICES, BOOKING_TIMES } from '../../lib/service-catalog';
+import { BOOKING_TIMES, type BookableService } from '../../lib/service-catalog';
 import { useSiteMedia } from '../../lib/use-site-media';
 import { managedMediaStyle, type SiteMediaValue } from '../../lib/site-media';
 
-const services = BOOKABLE_SERVICES;
 const times = BOOKING_TIMES;
 const serviceGroups = ['makeup', 'noivas', 'boss'] as const;
 
@@ -26,9 +25,9 @@ type BookingData = {
 
 const initialData: BookingData = { service: '', date: '', time: '', name: '', whatsapp: '', email: '', notes: '', paymentOption: 'deposit', consent: false };
 
-type Props = { initialMedia: SiteMediaValue[]; initialService: string; initialPayment: string; initialBooking: string; initialToken: string; initialPaymentId: string; initialTransactionNsu: string; initialSlug: string; initialReceiptUrl: string };
+type Props = { initialMedia: SiteMediaValue[]; initialServices: BookableService[]; initialService: string; initialPayment: string; initialBooking: string; initialToken: string; initialPaymentId: string; initialTransactionNsu: string; initialSlug: string; initialReceiptUrl: string };
 
-export default function BookingFlow({ initialMedia, initialService, initialPayment, initialBooking, initialToken, initialPaymentId, initialTransactionNsu, initialSlug, initialReceiptUrl }: Props) {
+export default function BookingFlow({ initialMedia, initialServices: services, initialService, initialPayment, initialBooking, initialToken, initialPaymentId, initialTransactionNsu, initialSlug, initialReceiptUrl }: Props) {
   const getMedia = useSiteMedia(initialMedia);
   const requestedService = services.some((service) => service.code === initialService) ? initialService : '';
   const requestedGroup = services.find((service) => service.code === requestedService)?.group || 'makeup';
@@ -77,7 +76,7 @@ export default function BookingFlow({ initialMedia, initialService, initialPayme
     return () => { active = false; };
   }, [data.date, data.service]);
 
-  const selectedService = useMemo(() => services.find((service) => service.code === data.service), [data.service]);
+  const selectedService = useMemo(() => services.find((service) => service.code === data.service), [data.service, services]);
   const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
 
   function nextStep() {
@@ -151,7 +150,7 @@ export default function BookingFlow({ initialMedia, initialService, initialPayme
                   <div className="service-options">
                     {services.filter((service) => service.group === activeGroup).map((service) => (
                       <button type="button" key={service.code} className={`service-option ${data.service === service.code ? 'selected' : ''}`} onClick={() => setData({ ...data, service: service.code, date: '', time: '' })} aria-pressed={data.service === service.code}>
-                        <div><h3>{service.name}</h3><p>{service.note}</p></div>
+                        <div><h3>{service.name}</h3><p>{service.tagline} · {service.description}</p></div>
                         <strong>{money(service.priceCents)}</strong>
                       </button>
                     ))}

@@ -7,19 +7,20 @@ import {
   AlertCircle, ArrowRight, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight,
   CircleDollarSign, Clock3, CreditCard, LayoutDashboard, MessageCircle, ReceiptText,
   RefreshCw, Search, Sparkles, Users, X, Plus, Ban, Trash2, Download, Pencil, Images,
-  Menu, Settings, ShieldCheck, KeyRound, MailCheck, Send,
+  Menu, Settings, ShieldCheck, KeyRound, MailCheck, Send, Tags,
 } from 'lucide-react';
 import type { Booking, Expense, ScheduleBlock } from '../../db/schema';
-import { BOOKING_TIMES, SERVICE_CATALOG } from '../../lib/service-catalog';
+import { BOOKING_TIMES, type BookableService } from '../../lib/service-catalog';
 import { useSiteMedia } from '../../lib/use-site-media';
 import { managedMediaStyle, type SiteMediaValue } from '../../lib/site-media';
 import MediaManager from './media-manager';
+import ServiceManager from './service-manager';
 
-type View = 'visao-geral' | 'agenda' | 'clientes' | 'clientes-pendentes' | 'financeiro' | 'comprovantes' | 'imagens' | 'conta';
+type View = 'visao-geral' | 'agenda' | 'clientes' | 'clientes-pendentes' | 'financeiro' | 'comprovantes' | 'servicos' | 'imagens' | 'conta';
 type PaymentAction = 'sync' | 'manual-paid';
 type AdminModal = '' | 'booking' | 'block' | 'expense' | 'edit';
 
-type Props = { initialBookings: Booking[]; initialExpenses: Expense[]; initialBlocks: ScheduleBlock[]; initialMedia: SiteMediaValue[]; username: string; signOutPath: string };
+type Props = { initialBookings: Booking[]; initialExpenses: Expense[]; initialBlocks: ScheduleBlock[]; initialMedia: SiteMediaValue[]; initialServices: BookableService[]; username: string; signOutPath: string };
 
 const navigation: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'visao-geral', label: 'Visão geral', icon: LayoutDashboard },
@@ -28,16 +29,18 @@ const navigation: { id: View; label: string; icon: typeof LayoutDashboard }[] = 
   { id: 'clientes-pendentes', label: 'Pendências', icon: Clock3 },
   { id: 'financeiro', label: 'Financeiro', icon: CircleDollarSign },
   { id: 'comprovantes', label: 'Pagamentos', icon: ReceiptText },
+  { id: 'servicos', label: 'Serviços e valores', icon: Tags },
   { id: 'imagens', label: 'Imagens do site', icon: Images },
   { id: 'conta', label: 'Acesso e segurança', icon: Settings },
 ];
 
-export default function AdminDashboard({ initialBookings, initialExpenses, initialBlocks, initialMedia, username, signOutPath }: Props) {
+export default function AdminDashboard({ initialBookings, initialExpenses, initialBlocks, initialMedia, initialServices, username, signOutPath }: Props) {
   const getMedia = useSiteMedia(initialMedia);
   const [bookings, setBookings] = useState(initialBookings);
   const [view, setView] = useState<View>('visao-geral');
   const [accountUsername, setAccountUsername] = useState(username);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [services, setServices] = useState(initialServices);
   const [query, setQuery] = useState('');
   const [agendaDate, setAgendaDate] = useState(todayInSaoPaulo());
   const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
@@ -300,10 +303,11 @@ export default function AdminDashboard({ initialBookings, initialExpenses, initi
         {view === 'comprovantes' && <section className="admin-panel admin-view-panel"><div className="panel-head"><div><h2>Pagamentos e comprovantes</h2><span>Confirmações do checkout e registros manuais</span></div><span>{bookings.length} registros</span></div><div className="payment-list proof-list">{bookings.map((booking) => <article className="payment-row" key={booking.id}><div><strong>{booking.clientName}</strong><small>{booking.id} · {booking.serviceLabel}</small></div><div><small>{booking.paymentOption === 'full' ? 'Integral' : 'Sinal 50%'}</small><strong>{booking.paymentAmountCents ? money(booking.paymentAmountCents) : 'Sob consulta'}</strong></div><span className={`payment-pill ${booking.paymentStatus}`}>{paymentLabel(booking.paymentStatus)}</span><div className="payment-proof">{booking.paymentId && <small>{paymentProviderLabel(booking.paymentProvider)} · {booking.paymentId}</small>}{booking.paymentReceiptUrl && <a className="receipt-link" href={booking.paymentReceiptUrl} target="_blank" rel="noreferrer">Comprovante InfinitePay</a>}{booking.receiptKey && <a className="receipt-link" href={`/api/receipts/${booking.id}`} target="_blank">Abrir comprovante</a>}{!booking.paymentId && !booking.receiptKey && <small>Aguardando pagamento</small>}<button className="details-link" onClick={() => setSelectedBookingId(booking.id)}>Ver reserva <ArrowRight size={11} /></button>{booking.paymentStatus !== 'pago' && <PaymentActions booking={booking} busy={busyPayment === booking.id} onAction={changePayment} />}</div></article>)}{!bookings.length && <div className="empty-state">Nenhum pagamento registrado.</div>}</div></section>}
 
         {view === 'imagens' && <MediaManager />}
+        {view === 'servicos' && <ServiceManager services={services} onChanged={setServices} />}
         {view === 'conta' && <AccountSettings username={accountUsername} onChanged={setAccountUsername} />}
       </section>
       {selectedBooking && <BookingDrawer booking={selectedBooking} busyPayment={busyPayment === selectedBooking.id} onClose={() => setSelectedBookingId('')} onStatusChange={changeStatus} onPaymentAction={changePayment} onEdit={() => setModal('edit')} onReceiveBalance={receiveBalance} />}
-      {modal && <OperationModal mode={modal} agendaDate={agendaDate} booking={modal === 'edit' ? selectedBooking : null} busy={operationBusy} onClose={() => setModal('')} onSubmit={submitOperation} />}
+      {modal && <OperationModal mode={modal} agendaDate={agendaDate} booking={modal === 'edit' ? selectedBooking : null} services={services} busy={operationBusy} onClose={() => setModal('')} onSubmit={submitOperation} />}
     </main>
   );
 }
@@ -445,11 +449,11 @@ function ExpenseList({ expenses, onDelete }: { expenses: Expense[]; onDelete: (i
   return <div className="expense-list">{expenses.map((expense) => <article key={expense.id}><div><strong>{expense.description}</strong><small>{formatDate(expense.expenseDate)} · {expense.category}</small></div><b>{money(expense.amountCents)}</b><button aria-label={`Excluir ${expense.description}`} onClick={() => onDelete(expense.id)}><Trash2 size={13} /></button></article>)}</div>;
 }
 
-function OperationModal({ mode, agendaDate, booking, busy, onClose, onSubmit }: { mode: AdminModal; agendaDate: string; booking: Booking | null; busy: boolean; onClose: () => void; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void }) {
+function OperationModal({ mode, agendaDate, booking, services, busy, onClose, onSubmit }: { mode: AdminModal; agendaDate: string; booking: Booking | null; services: BookableService[]; busy: boolean; onClose: () => void; onSubmit: (event: React.FormEvent<HTMLFormElement>) => void }) {
   const [fullDay, setFullDay] = useState(true);
   const isBooking = mode === 'booking' || mode === 'edit';
   const title = mode === 'booking' ? 'Novo atendimento' : mode === 'edit' ? 'Editar atendimento' : mode === 'block' ? 'Bloquear agenda' : 'Registrar despesa';
-  return <div className="operation-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="operation-modal" role="dialog" aria-modal="true" aria-labelledby="operation-title"><header><div><p className="eyebrow">Gestão do estúdio</p><h2 id="operation-title">{title}</h2></div><button aria-label="Fechar" onClick={onClose}><X size={18} /></button></header><form onSubmit={onSubmit}><input type="hidden" name="action" value={mode === 'booking' ? 'create-booking' : mode === 'edit' ? 'update-booking' : mode === 'block' ? 'create-block' : 'create-expense'} />{mode === 'edit' && <input type="hidden" name="id" value={booking?.id || ''} />}{isBooking && <><label>Nome da cliente<input name="clientName" defaultValue={booking?.clientName} required minLength={2} maxLength={120} /></label><div className="modal-grid"><label>WhatsApp<input name="whatsapp" defaultValue={booking?.whatsapp} required /></label><label>E-mail<input name="email" type="email" defaultValue={booking?.email || ''} /></label></div><label>Serviço<select name="service" defaultValue={booking?.service || Object.keys(SERVICE_CATALOG)[0]}>{Object.entries(SERVICE_CATALOG).map(([id, service]) => <option key={id} value={id}>{service.label} · {money(service.priceCents)}</option>)}</select></label><div className="modal-grid"><label>Data<input name="date" type="date" defaultValue={booking?.appointmentDate || agendaDate} required /></label><label>Horário<select name="time" defaultValue={booking?.appointmentTime || BOOKING_TIMES[0]}>{BOOKING_TIMES.map((time) => <option key={time}>{time}</option>)}</select></label></div>{mode === 'booking' && <><label>Forma de pagamento<select name="paymentOption" defaultValue="deposit"><option value="deposit">Sinal de 50%</option><option value="full">Valor integral</option></select></label><label className="modal-check"><input name="paid" type="checkbox" /> Pagamento já foi recebido</label></>}<label>Observações<textarea name="notes" defaultValue={booking?.notes || ''} maxLength={1200} rows={3} /></label></>}{mode === 'block' && <><label>Data<input name="date" type="date" defaultValue={agendaDate} required /></label><label className="modal-check"><input name="fullDay" type="checkbox" defaultChecked onChange={(event) => setFullDay(event.target.checked)} /> Bloquear o dia inteiro</label>{!fullDay && <div className="modal-grid"><label>Início<input name="startTime" type="time" required /></label><label>Fim<input name="endTime" type="time" required /></label></div>}<label>Motivo<input name="reason" placeholder="Ex.: compromisso pessoal" required maxLength={120} /></label></>}{mode === 'expense' && <><div className="modal-grid"><label>Data<input name="date" type="date" defaultValue={agendaDate} required /></label><label>Valor (R$)<input name="amount" inputMode="decimal" placeholder="0,00" required /></label></div><label>Descrição<input name="description" placeholder="Ex.: reposição de produtos" required maxLength={160} /></label><label>Categoria<select name="category"><option>Produtos</option><option>Transporte</option><option>Espaço</option><option>Marketing</option><option>Impostos</option><option>Outros</option></select></label></>}<footer><button type="button" onClick={onClose}>Cancelar</button><button className="primary" disabled={busy}>{busy ? 'Salvando...' : 'Salvar'}</button></footer></form></section></div>;
+  return <div className="operation-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}><section className="operation-modal" role="dialog" aria-modal="true" aria-labelledby="operation-title"><header><div><p className="eyebrow">Gestão do estúdio</p><h2 id="operation-title">{title}</h2></div><button aria-label="Fechar" onClick={onClose}><X size={18} /></button></header><form onSubmit={onSubmit}><input type="hidden" name="action" value={mode === 'booking' ? 'create-booking' : mode === 'edit' ? 'update-booking' : mode === 'block' ? 'create-block' : 'create-expense'} />{mode === 'edit' && <input type="hidden" name="id" value={booking?.id || ''} />}{isBooking && <><label>Nome da cliente<input name="clientName" defaultValue={booking?.clientName} required minLength={2} maxLength={120} /></label><div className="modal-grid"><label>WhatsApp<input name="whatsapp" defaultValue={booking?.whatsapp} required /></label><label>E-mail<input name="email" type="email" defaultValue={booking?.email || ''} /></label></div><label>Serviço<select name="service" defaultValue={booking?.service || services[0]?.code}>{services.filter((service) => service.active || service.code === booking?.service).map((service) => <option key={service.code} value={service.code}>{service.name} · {money(service.priceCents)}</option>)}</select></label><div className="modal-grid"><label>Data<input name="date" type="date" defaultValue={booking?.appointmentDate || agendaDate} required /></label><label>Horário<select name="time" defaultValue={booking?.appointmentTime || BOOKING_TIMES[0]}>{BOOKING_TIMES.map((time) => <option key={time}>{time}</option>)}</select></label></div>{mode === 'booking' && <><label>Forma de pagamento<select name="paymentOption" defaultValue="deposit"><option value="deposit">Sinal de 50%</option><option value="full">Valor integral</option></select></label><label className="modal-check"><input name="paid" type="checkbox" /> Pagamento já foi recebido</label></>}<label>Observações<textarea name="notes" defaultValue={booking?.notes || ''} maxLength={1200} rows={3} /></label></>}{mode === 'block' && <><label>Data<input name="date" type="date" defaultValue={agendaDate} required /></label><label className="modal-check"><input name="fullDay" type="checkbox" defaultChecked onChange={(event) => setFullDay(event.target.checked)} /> Bloquear o dia inteiro</label>{!fullDay && <div className="modal-grid"><label>Início<input name="startTime" type="time" required /></label><label>Fim<input name="endTime" type="time" required /></label></div>}<label>Motivo<input name="reason" placeholder="Ex.: compromisso pessoal" required maxLength={120} /></label></>}{mode === 'expense' && <><div className="modal-grid"><label>Data<input name="date" type="date" defaultValue={agendaDate} required /></label><label>Valor (R$)<input name="amount" inputMode="decimal" placeholder="0,00" required /></label></div><label>Descrição<input name="description" placeholder="Ex.: reposição de produtos" required maxLength={160} /></label><label>Categoria<select name="category"><option>Produtos</option><option>Transporte</option><option>Espaço</option><option>Marketing</option><option>Impostos</option><option>Outros</option></select></label></>}<footer><button type="button" onClick={onClose}>Cancelar</button><button className="primary" disabled={busy}>{busy ? 'Salvando...' : 'Salvar'}</button></footer></form></section></div>;
 }
 
 function groupClients(bookings: Booking[]) {

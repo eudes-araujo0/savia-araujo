@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     }
 
     if (booking.paymentStatus === 'pago') return NextResponse.json({ error: 'Este pagamento já foi aprovado.' }, { status: 409 });
-    await assertBookingAvailability(booking.appointmentDate, booking.appointmentTime, booking.service, booking.id);
+    await assertBookingAvailability(booking.appointmentDate, booking.appointmentTime, booking.service, booking.id, booking.durationMinutes);
     const expiresAt = pendingExpiry();
     await renewPendingBooking(id, expiresAt);
     const checkout = await createPaymentCheckout({ ...booking, status: 'pendente', paymentStatus: 'aguardando', expiresAt }, publicOrigin(request), token);
