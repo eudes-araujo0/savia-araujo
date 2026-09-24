@@ -189,10 +189,12 @@ export default function BookingFlow({ initialMedia, initialServices: services, i
                     </div>
                     <div className="booking-calendar-weekdays" aria-hidden="true">{['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((day, index) => <span key={`${day}-${index}`}>{day}</span>)}</div>
                     <div className="booking-calendar-grid">
-                      {calendarDays.map((day) => <button type="button" key={day.date} className={`${day.inMonth ? '' : 'outside'} ${data.date === day.date ? 'selected' : ''}`} disabled={day.disabled} aria-label={longCalendarDate(day.date)} aria-pressed={data.date === day.date} onClick={() => { setError(''); setTimes([]); setUnavailableTimes([]); setAvailabilityClosed(false); setAvailabilityLoading(true); setData({ ...data, date: day.date, time: '' }); }}>{day.day}</button>)}
+                      {calendarDays.map((day) => day.hidden
+                        ? <span className="booking-calendar-empty" key={day.date} aria-hidden="true" />
+                        : <button type="button" key={day.date} className={data.date === day.date ? 'selected' : ''} disabled={day.disabled} aria-label={longCalendarDate(day.date)} aria-pressed={data.date === day.date} onClick={() => { setError(''); setTimes([]); setUnavailableTimes([]); setAvailabilityClosed(false); setAvailabilityLoading(true); setData({ ...data, date: day.date, time: '' }); }}>{day.day}</button>)}
                     </div>
                   </div>
-                  <small className="calendar-help">Dias sem atendimento ficam indisponíveis automaticamente.</small>
+                  <small className="calendar-help">Datas passadas não são exibidas. Dias sem atendimento ficam indisponíveis automaticamente.</small>
                 </div>
                 <div className="form-field full">
                   <label>Horário de preferência</label>
@@ -270,14 +272,25 @@ function money(cents: number) {
 function buildCalendarDays(month: string, today: string, openDays: number[]) {
   const [year, monthNumber] = month.split('-').map(Number);
   const first = new Date(Date.UTC(year, monthNumber - 1, 1));
+  const last = new Date(Date.UTC(year, monthNumber, 0));
   const start = new Date(first);
   start.setUTCDate(1 - first.getUTCDay());
-  return Array.from({ length: 42 }, (_, index) => {
+  if (month.slice(0, 7) === today.slice(0, 7)) {
+    const current = new Date(`${today}T12:00:00Z`);
+    const currentWeekStart = new Date(current);
+    currentWeekStart.setUTCDate(current.getUTCDate() - current.getUTCDay());
+    if (currentWeekStart > start) start.setTime(currentWeekStart.getTime());
+  }
+  const end = new Date(last);
+  end.setUTCDate(last.getUTCDate() + (6 - last.getUTCDay()));
+  const length = Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
+  return Array.from({ length }, (_, index) => {
     const date = new Date(start);
     date.setUTCDate(start.getUTCDate() + index);
     const iso = date.toISOString().slice(0, 10);
     const inMonth = date.getUTCMonth() === monthNumber - 1;
-    return { date: iso, day: date.getUTCDate(), inMonth, disabled: !inMonth || iso < today || !openDays.includes(date.getUTCDay()) };
+    const hidden = !inMonth || iso < today;
+    return { date: iso, day: date.getUTCDate(), hidden, disabled: hidden || !openDays.includes(date.getUTCDay()) };
   });
 }
 
