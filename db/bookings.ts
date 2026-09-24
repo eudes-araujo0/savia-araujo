@@ -13,6 +13,7 @@ let initialized: Promise<void> | null = null;
 const PENDING_TTL_MS = 30 * 60 * 1000;
 
 export async function ensureBookingsSchema() {
+  if (process.env.NODE_ENV === 'production') return;
   if (initialized) return initialized;
 
   initialized = (async () => {
@@ -199,14 +200,22 @@ export async function getBooking(id: string): Promise<Booking | null> {
 
 export async function getBookingAvailability(appointmentDate: string, requestedService = '', requestedDuration?: number) {
   await ensureBookingsSchema();
-  await expireStaleBookings();
   const sql = database();
-  const schedule = await getBusinessSchedule();
-  const duration = requestedDuration || (await getService(requestedService, true))?.durationMinutes || 90;
+  const now = Date.now();
+  const [schedule, fallbackService, rows, blocks] = await Promise.all([
+    getBusinessSchedule(),
+    requestedDuration ? Promise.resolve(null) : getService(requestedService, true),
+    sql`SELECT appointment_time, service, duration_minutes FROM bookings
+      WHERE appointment_date = ${appointmentDate}
+        AND status NOT IN ('cancelado', 'expirado')
+        AND NOT (status = 'pendente' AND payment_status IN ('aguardando', 'configuracao_pendente') AND expires_at IS NOT NULL AND expires_at <= ${now})`,
+    sql`SELECT start_time, end_time FROM schedule_blocks WHERE block_date = ${appointmentDate}`,
+    sql`UPDATE bookings SET status = 'expirado', payment_status = 'expirado'
+      WHERE status = 'pendente' AND payment_status IN ('aguardando', 'configuracao_pendente') AND expires_at IS NOT NULL AND expires_at <= ${now}`,
+  ]);
+  const duration = requestedDuration || fallbackService?.durationMinutes || 90;
   const times = buildScheduleTimes(schedule, appointmentDate, duration);
   if (!isBusinessDay(schedule, appointmentDate)) return { times: [], unavailable: [], closed: true };
-  const rows = await sql`SELECT appointment_time, service, duration_minutes FROM bookings WHERE appointment_date = ${appointmentDate} AND status NOT IN ('cancelado', 'expirado')`;
-  const blocks = await sql`SELECT start_time, end_time FROM schedule_blocks WHERE block_date = ${appointmentDate}`;
   if (blocks.some((block) => !block.start_time || !block.end_time) || (isBridalService(requestedService) && rows.length > 0) || rows.some((row) => isBridalService(String(row.service)))) {
     return { times, unavailable: times, closed: false };
   }

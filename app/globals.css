@@ -196,8 +196,8 @@ footer > div a:hover { color: var(--gold); }
 footer > small { justify-self: end; color: rgba(243,237,226,.34); font-size: 8px; letter-spacing: .04em; }
 
 /* Booking */
-.booking-page { min-height: 100svh; display: grid; grid-template-columns: minmax(370px,.82fr) 1.18fr; background: var(--cream); color: var(--ink); }
-.booking-visual { position: relative; min-height: 100svh; overflow: hidden; color: var(--cream); }
+.booking-page { min-height: 100svh; display: grid; grid-template-columns: minmax(370px,.82fr) 1.18fr; align-items: start; background: var(--cream); color: var(--ink); }
+.booking-visual { position: sticky; top: 0; height: 100svh; min-height: 100svh; align-self: start; overflow: hidden; color: var(--cream); }
 .booking-visual img, .booking-visual::after { position: absolute; inset: 0; width: 100%; height: 100%; }
 .booking-visual img { object-fit: cover; object-position: center 38%; }
 .booking-visual::after { content: ''; background: linear-gradient(0deg, rgba(7,7,6,.9), rgba(7,7,6,.08) 65%), linear-gradient(90deg, rgba(7,7,6,.32), transparent); }
@@ -239,6 +239,7 @@ footer > small { justify-self: end; color: rgba(243,237,226,.34); font-size: 8px
 .time-option { border: 1px solid rgba(10,10,9,.15); background: transparent; padding: 13px 8px; cursor: pointer; font-size: 11px; transition: .2s; }
 .time-option:hover, .time-option.selected { border-color: var(--gold); background: var(--gold); color: var(--ink); }
 .time-option:disabled { cursor: not-allowed; opacity: .38; background: rgba(10,10,9,.05); }
+.time-option.checking { opacity: .58; }
 .time-option small { display: block; margin-top: 3px; font-size: 7px; text-transform: uppercase; letter-spacing: .06em; }
 .booking-calendar { border: 1px solid rgba(10,10,9,.14); background: rgba(255,255,255,.34); padding: 16px; }
 .booking-calendar-head { display: grid; grid-template-columns: 34px 1fr 34px; align-items: center; margin-bottom: 14px; }
@@ -624,7 +625,7 @@ footer > small { justify-self: end; color: rgba(243,237,226,.34); font-size: 8px
   footer > div { flex-wrap: wrap; gap: 16px; }
 
   .booking-page { display: block; }
-  .booking-visual { min-height: 360px; }
+  .booking-visual { position: relative; height: auto; min-height: 360px; }
   .booking-visual .brand { top: 24px; left: 20px; }
   .booking-visual-copy { left: 20px; right: 20px; bottom: 27px; }
   .booking-visual-copy h1 { font-size: 54px; }

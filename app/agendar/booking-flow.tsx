@@ -8,6 +8,7 @@ import type { BookableService } from '../../lib/service-catalog';
 import type { BusinessSchedule } from '../../db/schema';
 import { useSiteMedia } from '../../lib/use-site-media';
 import { managedMediaStyle, type SiteMediaValue } from '../../lib/site-media';
+import { buildScheduleTimes } from '../../lib/business-hours';
 
 const serviceGroups = ['makeup', 'noivas', 'boss'] as const;
 
@@ -191,7 +192,15 @@ export default function BookingFlow({ initialMedia, initialServices: services, i
                     <div className="booking-calendar-grid">
                       {calendarDays.map((day) => day.hidden
                         ? <span className="booking-calendar-empty" key={day.date} aria-hidden="true" />
-                        : <button type="button" key={day.date} className={data.date === day.date ? 'selected' : ''} disabled={day.disabled} aria-label={longCalendarDate(day.date)} aria-pressed={data.date === day.date} onClick={() => { setError(''); setTimes([]); setUnavailableTimes([]); setAvailabilityClosed(false); setAvailabilityLoading(true); setData({ ...data, date: day.date, time: '' }); }}>{day.day}</button>)}
+                        : <button type="button" key={day.date} className={data.date === day.date ? 'selected' : ''} disabled={day.disabled} aria-label={longCalendarDate(day.date)} aria-pressed={data.date === day.date} onClick={() => {
+                          const previewTimes = selectedService ? buildScheduleTimes(initialSchedule, day.date, selectedService.durationMinutes) : [];
+                          setError('');
+                          setTimes(previewTimes);
+                          setUnavailableTimes(previewTimes);
+                          setAvailabilityClosed(false);
+                          setAvailabilityLoading(true);
+                          setData({ ...data, date: day.date, time: '' });
+                        }}>{day.day}</button>)}
                     </div>
                   </div>
                   <small className="calendar-help">Datas passadas não são exibidas. Dias sem atendimento ficam indisponíveis automaticamente.</small>
@@ -199,7 +208,7 @@ export default function BookingFlow({ initialMedia, initialServices: services, i
                 <div className="form-field full">
                   <label>Horário de preferência</label>
                   <div className="time-grid">
-                    {times.map((time) => <button type="button" key={time} disabled={unavailableTimes.includes(time)} className={`time-option ${data.time === time ? 'selected' : ''}`} onClick={() => setData({ ...data, time })}>{time}{unavailableTimes.includes(time) ? <small>indisponível</small> : null}</button>)}
+                    {times.map((time) => <button type="button" key={time} disabled={availabilityLoading || unavailableTimes.includes(time)} className={`time-option ${availabilityLoading ? 'checking' : ''} ${data.time === time ? 'selected' : ''}`} onClick={() => setData({ ...data, time })}>{time}{availabilityLoading ? <small>verificando</small> : unavailableTimes.includes(time) ? <small>indisponível</small> : null}</button>)}
                   </div>
                   {!data.date && <p className="availability-feedback">Escolha uma data para ver os horários.</p>}
                   {availabilityLoading && <p className="availability-feedback">Consultando a agenda...</p>}

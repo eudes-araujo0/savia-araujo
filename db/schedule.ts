@@ -12,6 +12,7 @@ export const DEFAULT_BUSINESS_SCHEDULE: BusinessSchedule = {
 let initialized: Promise<void> | null = null;
 
 async function ensureScheduleSchema() {
+  if (process.env.NODE_ENV === 'production') return;
   if (initialized) return initialized;
   initialized = (async () => {
     const sql = database();

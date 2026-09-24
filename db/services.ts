@@ -4,6 +4,7 @@ import { BOOKABLE_SERVICE_CODES, BOOKABLE_SERVICES, type BookableService, type S
 let servicesInitialized: Promise<void> | null = null;
 
 export async function ensureServicesSchema() {
+  if (process.env.NODE_ENV === 'production') return;
   if (servicesInitialized) return servicesInitialized;
   servicesInitialized = (async () => {
     const sql = database();
