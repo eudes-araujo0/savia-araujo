@@ -70,6 +70,10 @@ export async function listSiteMedia(): Promise<SiteMediaValue[]> {
   return rows.map(mapMediaRow).filter((value): value is SiteMediaValue => Boolean(value));
 }
 
+export async function listPublicSiteMedia(): Promise<SiteMediaValue[]> {
+  return (await listSiteMedia()).filter((item) => !item.slotId.startsWith('admin.'));
+}
+
 export async function listSiteMediaLibrary(): Promise<SiteMediaLibraryItem[]> {
   await ensureMediaSchema();
   const [currentRows, versionRows] = await Promise.all([

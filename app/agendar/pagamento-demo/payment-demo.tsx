@@ -31,7 +31,7 @@ export default function DemoPayment({ booking, token, managementToken }: { booki
         <span className="demo-payment-icon success"><Check size={26} /></span>
         <p className="booking-step-label">Pagamento demonstrativo aprovado</p>
         <h1>Reserva<br />confirmada.</h1>
-        <p>O painel administrativo já recebeu a confirmação, registrou o sinal e atualizou a agenda.</p>
+        <p>A confirmação foi registrada automaticamente, o sinal foi identificado e o horário está reservado.</p>
         <Link className="button button-dark" href={`/agendar?payment=success&booking=${encodeURIComponent(booking)}${managementToken ? `&token=${encodeURIComponent(managementToken)}` : ''}`}>Concluir</Link>
       </>}
     </section>
