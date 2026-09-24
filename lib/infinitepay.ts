@@ -98,7 +98,12 @@ function trustedSiteOrigin(value: string) {
 function safeCheckoutUrl(value: string) {
   try {
     const url = new URL(value);
-    return url.protocol === 'https:' && (url.hostname === 'checkout.infinitepay.com.br' || url.hostname.endsWith('.infinitepay.com.br')) ? url.toString() : '';
+    const hostname = url.hostname.toLowerCase().replace(/\.$/, '');
+    const trustedHostname = hostname === 'infinitepay.io'
+      || hostname.endsWith('.infinitepay.io')
+      || hostname === 'infinitepay.com.br'
+      || hostname.endsWith('.infinitepay.com.br');
+    return url.protocol === 'https:' && !url.username && !url.password && trustedHostname ? url.toString() : '';
   } catch {
     return '';
   }
