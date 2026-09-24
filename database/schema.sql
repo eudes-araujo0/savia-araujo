@@ -135,6 +135,35 @@ BEGIN
 END
 $$;
 
+CREATE TABLE IF NOT EXISTS admin_credentials (
+  id TEXT PRIMARY KEY,
+  username TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  updated_at BIGINT NOT NULL,
+  CONSTRAINT admin_credentials_singleton CHECK (id = 'master')
+);
+
+ALTER TABLE admin_credentials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE admin_credentials FORCE ROW LEVEL SECURITY;
+REVOKE ALL ON admin_credentials FROM PUBLIC;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname = current_schema()
+      AND tablename = 'admin_credentials'
+      AND policyname = 'admin_credentials_backend_only'
+  ) THEN
+    CREATE POLICY admin_credentials_backend_only
+      ON admin_credentials
+      TO CURRENT_USER
+      USING (true)
+      WITH CHECK (true);
+  END IF;
+END
+$$;
+
 CREATE TABLE IF NOT EXISTS site_media (
   slot_id TEXT PRIMARY KEY,
   url TEXT NOT NULL,

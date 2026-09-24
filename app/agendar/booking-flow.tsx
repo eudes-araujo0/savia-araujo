@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Check, CreditCard, ShieldCheck } from 'lucide-react';
 import { BOOKABLE_SERVICES, BOOKING_TIMES } from '../../lib/service-catalog';
 import { useSiteMedia } from '../../lib/use-site-media';
-import { managedMediaStyle } from '../../lib/site-media';
+import { managedMediaStyle, type SiteMediaValue } from '../../lib/site-media';
 
 const services = BOOKABLE_SERVICES;
 const times = BOOKING_TIMES;
@@ -26,10 +26,10 @@ type BookingData = {
 
 const initialData: BookingData = { service: '', date: '', time: '', name: '', whatsapp: '', email: '', notes: '', paymentOption: 'deposit', consent: false };
 
-type Props = { initialService: string; initialPayment: string; initialBooking: string; initialToken: string; initialPaymentId: string; initialTransactionNsu: string; initialSlug: string; initialReceiptUrl: string };
+type Props = { initialMedia: SiteMediaValue[]; initialService: string; initialPayment: string; initialBooking: string; initialToken: string; initialPaymentId: string; initialTransactionNsu: string; initialSlug: string; initialReceiptUrl: string };
 
-export default function BookingFlow({ initialService, initialPayment, initialBooking, initialToken, initialPaymentId, initialTransactionNsu, initialSlug, initialReceiptUrl }: Props) {
-  const getMedia = useSiteMedia();
+export default function BookingFlow({ initialMedia, initialService, initialPayment, initialBooking, initialToken, initialPaymentId, initialTransactionNsu, initialSlug, initialReceiptUrl }: Props) {
+  const getMedia = useSiteMedia(initialMedia);
   const requestedService = services.some((service) => service.code === initialService) ? initialService : '';
   const requestedGroup = services.find((service) => service.code === requestedService)?.group || 'makeup';
   const returnedFromPayment = Boolean(initialPayment && initialBooking);

@@ -11,7 +11,7 @@ Projeto completo em Next.js para publicar na Vercel, com serviços de maquiagem,
 - escolha entre sinal de 50% ou pagamento integral;
 - checkout InfinitePay (Pix e cartão) com confirmação por webhook e conferência direta na API;
 - modo de demonstração sem cobrança real;
-- login administrativo por usuário e senha;
+- login administrativo por usuário e senha, com redefinição segura pela própria proprietária;
 - agenda inteligente com duração por serviço, bloqueio manual e pré-reserva de 30 minutos;
 - criação e edição de atendimentos, clientes pagos, pendentes, financeiro, despesas e comprovantes no painel;
 - agendamentos, receitas, despesas, saldos e resultado agrupados por dia, com exportação CSV;
@@ -88,6 +88,8 @@ $senha | npm run hash-password --silent
 ```
 
 Copie apenas o resultado para `ADMIN_PASSWORD_HASH`. Depois remova `ADMIN_PASSWORD` da Vercel. A aplicação usa o hash quando as duas variáveis existem.
+
+As variáveis `ADMIN_USERNAME` e `ADMIN_PASSWORD_HASH` criam o primeiro acesso. Depois, em **Painel > Acesso e segurança**, a proprietária pode definir seu usuário e sua senha definitivos. A partir desse primeiro salvamento, as credenciais protegidas no Neon passam a substituir o acesso temporário das variáveis e as outras sessões são encerradas. Em caso de perda do acesso, remova somente a linha `master` da tabela `admin_credentials` na Neon para voltar ao acesso inicial das variáveis.
 
 Durante a apresentação, use `PAYMENTS_DEMO_MODE=true`. Para produção, altere para `false`, use `PAYMENT_PROVIDER=infinitepay`, informe a `INFINITEPAY_HANDLE` e faça um novo deploy.
 

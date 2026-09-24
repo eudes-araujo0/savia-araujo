@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import BookingFlow from './booking-flow';
+import { listSiteMedia } from '../../db/media';
 
 export const metadata: Metadata = {
   title: 'Agendar horário | Sávia Araújo',
@@ -12,5 +13,6 @@ export default async function BookingPage({ searchParams }: { searchParams: Prom
   const stored = (await cookies()).get('savia_manage')?.value || '';
   const [storedBooking, storedToken] = stored.split('.', 2);
   const initialToken = params.token || (params.booking && storedBooking === params.booking ? storedToken : '') || '';
-  return <BookingFlow initialService={params.service || ''} initialPayment={params.payment || ''} initialBooking={params.booking || ''} initialToken={initialToken} initialPaymentId={params.payment_id || params.collection_id || ''} initialTransactionNsu={params.transaction_nsu || ''} initialSlug={params.slug || ''} initialReceiptUrl={params.receipt_url || ''} />;
+  const initialMedia = await listSiteMedia().catch(() => []);
+  return <BookingFlow initialMedia={initialMedia} initialService={params.service || ''} initialPayment={params.payment || ''} initialBooking={params.booking || ''} initialToken={initialToken} initialPaymentId={params.payment_id || params.collection_id || ''} initialTransactionNsu={params.transaction_nsu || ''} initialSlug={params.slug || ''} initialReceiptUrl={params.receipt_url || ''} />;
 }

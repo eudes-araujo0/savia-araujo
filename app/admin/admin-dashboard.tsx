@@ -7,18 +7,19 @@ import {
   AlertCircle, ArrowRight, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight,
   CircleDollarSign, Clock3, CreditCard, LayoutDashboard, MessageCircle, ReceiptText,
   RefreshCw, Search, Sparkles, Users, X, Plus, Ban, Trash2, Download, Pencil, Images,
+  Menu, Settings, ShieldCheck, KeyRound,
 } from 'lucide-react';
 import type { Booking, Expense, ScheduleBlock } from '../../db/schema';
 import { BOOKING_TIMES, SERVICE_CATALOG } from '../../lib/service-catalog';
 import { useSiteMedia } from '../../lib/use-site-media';
-import { managedMediaStyle } from '../../lib/site-media';
+import { managedMediaStyle, type SiteMediaValue } from '../../lib/site-media';
 import MediaManager from './media-manager';
 
-type View = 'visao-geral' | 'agenda' | 'clientes' | 'clientes-pendentes' | 'financeiro' | 'comprovantes' | 'imagens';
+type View = 'visao-geral' | 'agenda' | 'clientes' | 'clientes-pendentes' | 'financeiro' | 'comprovantes' | 'imagens' | 'conta';
 type PaymentAction = 'sync' | 'manual-paid';
 type AdminModal = '' | 'booking' | 'block' | 'expense' | 'edit';
 
-type Props = { initialBookings: Booking[]; initialExpenses: Expense[]; initialBlocks: ScheduleBlock[]; username: string; signOutPath: string };
+type Props = { initialBookings: Booking[]; initialExpenses: Expense[]; initialBlocks: ScheduleBlock[]; initialMedia: SiteMediaValue[]; username: string; signOutPath: string };
 
 const navigation: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'visao-geral', label: 'Visão geral', icon: LayoutDashboard },
@@ -28,12 +29,15 @@ const navigation: { id: View; label: string; icon: typeof LayoutDashboard }[] = 
   { id: 'financeiro', label: 'Financeiro', icon: CircleDollarSign },
   { id: 'comprovantes', label: 'Pagamentos', icon: ReceiptText },
   { id: 'imagens', label: 'Imagens do site', icon: Images },
+  { id: 'conta', label: 'Acesso e segurança', icon: Settings },
 ];
 
-export default function AdminDashboard({ initialBookings, initialExpenses, initialBlocks, username, signOutPath }: Props) {
-  const getMedia = useSiteMedia();
+export default function AdminDashboard({ initialBookings, initialExpenses, initialBlocks, initialMedia, username, signOutPath }: Props) {
+  const getMedia = useSiteMedia(initialMedia);
   const [bookings, setBookings] = useState(initialBookings);
   const [view, setView] = useState<View>('visao-geral');
+  const [accountUsername, setAccountUsername] = useState(username);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [agendaDate, setAgendaDate] = useState(todayInSaoPaulo());
   const [feedback, setFeedback] = useState<{ kind: 'success' | 'error'; message: string } | null>(null);
@@ -81,6 +85,18 @@ export default function AdminDashboard({ initialBookings, initialExpenses, initi
     window.addEventListener('keydown', closeOnEscape);
     return () => window.removeEventListener('keydown', closeOnEscape);
   }, [selectedBookingId]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setMobileMenuOpen(false); };
+    document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [mobileMenuOpen]);
 
   const activeBookings = useMemo(() => bookings.filter((booking) => !['cancelado', 'expirado'].includes(booking.status)), [bookings]);
   const paidBookings = useMemo(() => activeBookings.filter((booking) => booking.paymentStatus === 'pago'), [activeBookings]);
@@ -166,6 +182,7 @@ export default function AdminDashboard({ initialBookings, initialExpenses, initi
   }
 
   function openAgenda(date = today) { setAgendaDate(date); setView('agenda'); }
+  function openView(nextView: View) { setView(nextView); setMobileMenuOpen(false); }
   function shiftAgenda(days: number) { setAgendaDate((current) => iso(addDays(new Date(`${current}T12:00:00Z`), days))); }
 
   async function submitOperation(event: React.FormEvent<HTMLFormElement>) {
@@ -207,17 +224,32 @@ export default function AdminDashboard({ initialBookings, initialExpenses, initi
   return (
     <main className="admin-page">
       <aside className="admin-sidebar">
-        <Link className="brand" href="/">SÁVIA <span>ARAÚJO</span></Link>
-        <p className="admin-nav-label">Gestão do estúdio</p>
-        <nav className="admin-nav" aria-label="Painel administrativo">
-          {navigation.map(({ id, label, icon: Icon }) => {
-            const badge = id === 'clientes-pendentes' ? pendingBookings.length : id === 'agenda' ? todayBookings.length : 0;
-            return <button key={id} className={view === id ? 'active' : ''} onClick={() => setView(id)}><Icon size={15} /><span>{label}</span>{badge > 0 && <b>{badge}</b>}</button>;
-          })}
-        </nav>
-        <div className="admin-owner-card"><Image className="managed-media" src={getMedia('admin.profile').url} alt={getMedia('admin.profile').alt} fill sizes="240px" style={managedMediaStyle(getMedia('admin.profile'))} /><div><strong>Sávia Araújo</strong><small>Makeup Artist</small></div></div>
-        <div className="admin-user"><strong>{username}</strong><small>Acesso master</small><a href={signOutPath}>Sair do painel</a></div>
+        <div className="admin-sidebar-head">
+          <Link className="brand" href="/">SÁVIA <span>ARAÚJO</span></Link>
+          <button
+            className="admin-menu-toggle"
+            type="button"
+            aria-label={mobileMenuOpen ? 'Fechar menu do painel' : 'Abrir menu do painel'}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="admin-mobile-navigation"
+            onClick={() => setMobileMenuOpen((current) => !current)}
+          >
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+          </button>
+        </div>
+        <div className={`admin-sidebar-content ${mobileMenuOpen ? 'open' : ''}`} id="admin-mobile-navigation">
+          <p className="admin-nav-label">Gestão do estúdio</p>
+          <nav className="admin-nav" aria-label="Painel administrativo">
+            {navigation.map(({ id, label, icon: Icon }) => {
+              const badge = id === 'clientes-pendentes' ? pendingBookings.length : id === 'agenda' ? todayBookings.length : 0;
+              return <button key={id} className={view === id ? 'active' : ''} onClick={() => openView(id)}><Icon size={15} /><span>{label}</span>{badge > 0 && <b>{badge}</b>}</button>;
+            })}
+          </nav>
+          <div className="admin-owner-card"><Image className="managed-media" src={getMedia('admin.profile').url} alt={getMedia('admin.profile').alt} fill sizes="240px" style={managedMediaStyle(getMedia('admin.profile'))} /><div><strong>Sávia Araújo</strong><small>Makeup Artist</small></div></div>
+          <div className="admin-user"><strong>{accountUsername}</strong><small>Acesso master</small><button type="button" onClick={() => openView('conta')}>Alterar acesso</button><a href={signOutPath}>Sair do painel</a></div>
+        </div>
       </aside>
+      {mobileMenuOpen && <button className="admin-menu-overlay" type="button" aria-label="Fechar menu" onClick={() => setMobileMenuOpen(false)} />}
 
       <section className="admin-main">
         <header className="admin-header">
@@ -233,7 +265,7 @@ export default function AdminDashboard({ initialBookings, initialExpenses, initi
           </section>
           {!bookings.length && <p className="admin-demo-banner">O painel está conectado ao banco. Faça um agendamento pelo site para ver o fluxo completo aparecer aqui.</p>}
           <div className="admin-priority-grid" aria-label="Atalhos de prioridade">
-            <button className={pendingBookings.length ? 'attention' : ''} onClick={() => setView('clientes-pendentes')}><AlertCircle size={18} /><span><small>Aguardando pagamento</small><strong>{pendingBookings.length}</strong><em>{pendingBookings.length ? `${money(pendingValue)} a confirmar` : 'Tudo em dia'}</em></span><ArrowRight size={15} /></button>
+            <button className={pendingBookings.length ? 'attention' : ''} onClick={() => openView('clientes-pendentes')}><AlertCircle size={18} /><span><small>Aguardando pagamento</small><strong>{pendingBookings.length}</strong><em>{pendingBookings.length ? `${money(pendingValue)} a confirmar` : 'Tudo em dia'}</em></span><ArrowRight size={15} /></button>
             <button onClick={() => openAgenda()}><CalendarDays size={18} /><span><small>Agenda de hoje</small><strong>{todayBookings.length}</strong><em>{todayBookings.length === 1 ? 'atendimento' : 'atendimentos'}</em></span><ArrowRight size={15} /></button>
             <button onClick={() => openAgenda(nextBooking?.appointmentDate)}><Clock3 size={18} /><span><small>Próximos 7 dias</small><strong>{upcomingBookings.length}</strong><em>compromissos ativos</em></span><ArrowRight size={15} /></button>
             <button onClick={() => setView('financeiro')}><CircleDollarSign size={18} /><span><small>Recebido</small><strong>{money(financial.received)}</strong><em>pagamentos aprovados</em></span><ArrowRight size={15} /></button>
@@ -268,11 +300,71 @@ export default function AdminDashboard({ initialBookings, initialExpenses, initi
         {view === 'comprovantes' && <section className="admin-panel admin-view-panel"><div className="panel-head"><div><h2>Pagamentos e comprovantes</h2><span>Confirmações do checkout e registros manuais</span></div><span>{bookings.length} registros</span></div><div className="payment-list proof-list">{bookings.map((booking) => <article className="payment-row" key={booking.id}><div><strong>{booking.clientName}</strong><small>{booking.id} · {booking.serviceLabel}</small></div><div><small>{booking.paymentOption === 'full' ? 'Integral' : 'Sinal 50%'}</small><strong>{booking.paymentAmountCents ? money(booking.paymentAmountCents) : 'Sob consulta'}</strong></div><span className={`payment-pill ${booking.paymentStatus}`}>{paymentLabel(booking.paymentStatus)}</span><div className="payment-proof">{booking.paymentId && <small>{paymentProviderLabel(booking.paymentProvider)} · {booking.paymentId}</small>}{booking.paymentReceiptUrl && <a className="receipt-link" href={booking.paymentReceiptUrl} target="_blank" rel="noreferrer">Comprovante InfinitePay</a>}{booking.receiptKey && <a className="receipt-link" href={`/api/receipts/${booking.id}`} target="_blank">Abrir comprovante</a>}{!booking.paymentId && !booking.receiptKey && <small>Aguardando pagamento</small>}<button className="details-link" onClick={() => setSelectedBookingId(booking.id)}>Ver reserva <ArrowRight size={11} /></button>{booking.paymentStatus !== 'pago' && <PaymentActions booking={booking} busy={busyPayment === booking.id} onAction={changePayment} />}</div></article>)}{!bookings.length && <div className="empty-state">Nenhum pagamento registrado.</div>}</div></section>}
 
         {view === 'imagens' && <MediaManager />}
+        {view === 'conta' && <AccountSettings username={accountUsername} onChanged={setAccountUsername} />}
       </section>
       {selectedBooking && <BookingDrawer booking={selectedBooking} busyPayment={busyPayment === selectedBooking.id} onClose={() => setSelectedBookingId('')} onStatusChange={changeStatus} onPaymentAction={changePayment} onEdit={() => setModal('edit')} onReceiveBalance={receiveBalance} />}
       {modal && <OperationModal mode={modal} agendaDate={agendaDate} booking={modal === 'edit' ? selectedBooking : null} busy={operationBusy} onClose={() => setModal('')} onSubmit={submitOperation} />}
     </main>
   );
+}
+
+function AccountSettings({ username, onChanged }: { username: string; onChanged: (username: string) => void }) {
+  const [newUsername, setNewUsername] = useState(username);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setMessage(null);
+    try {
+      const response = await fetch('/api/admin/account', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newUsername, newPassword, confirmPassword }),
+      });
+      const result = await response.json() as { username?: string; error?: string };
+      if (!response.ok || !result.username) throw new Error(result.error || 'Não foi possível alterar o acesso.');
+      onChanged(result.username);
+      setNewUsername(result.username);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setMessage({ kind: 'success', text: 'Acesso atualizado. As outras sessões foram encerradas automaticamente.' });
+    } catch (error) {
+      setMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Não foi possível alterar o acesso.' });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return <div className="account-settings">
+    <section className="account-settings-hero">
+      <div><p className="eyebrow">Proprietária do painel</p><h2>Seu acesso,<br /><em>sob seu controle.</em></h2></div>
+      <div className="account-security-seal"><ShieldCheck size={25} /><span><strong>Acesso master</strong><small>Dados protegidos e senha armazenada somente como hash.</small></span></div>
+    </section>
+    <div className="account-settings-grid">
+      <form className="account-form" onSubmit={submit}>
+        <div className="account-form-heading"><KeyRound size={18} /><div><h3>Redefinir usuário e senha</h3><p>Confirme a senha atual e escolha os dados definitivos da Sávia.</p></div></div>
+        <label><span>Novo usuário</span><input autoComplete="username" value={newUsername} onChange={(event) => setNewUsername(event.target.value)} minLength={3} maxLength={60} required /></label>
+        <label><span>Senha atual</span><input type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} maxLength={256} required /></label>
+        <div className="account-password-row">
+          <label><span>Nova senha</span><input type="password" autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} minLength={12} maxLength={256} required /></label>
+          <label><span>Confirmar nova senha</span><input type="password" autoComplete="new-password" value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} minLength={12} maxLength={256} required /></label>
+        </div>
+        <p className="account-password-hint">Use no mínimo 12 caracteres, com letra maiúscula, minúscula e número.</p>
+        {message && <p className={`account-message ${message.kind}`} role="status">{message.text}</p>}
+        <button className="account-submit" type="submit" disabled={busy}>{busy ? 'Salvando novo acesso…' : 'Salvar novo acesso'}</button>
+      </form>
+      <aside className="account-notes">
+        <small>O que acontece ao salvar</small>
+        <ol><li><strong>O acesso atual é substituído</strong><span>O usuário temporário deixa de funcionar.</span></li><li><strong>Outros dispositivos são desconectados</strong><span>Somente esta sessão continua ativa.</span></li><li><strong>A senha não fica visível</strong><span>O banco guarda apenas um hash seguro.</span></li></ol>
+      </aside>
+    </div>
+  </div>;
 }
 
 function AppointmentList({ bookings, onStatusChange, onOpen, showPayment = false }: { bookings: Booking[]; onStatusChange: (id: string, status: string) => void; onOpen: (id: string) => void; showPayment?: boolean }) {
