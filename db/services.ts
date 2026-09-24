@@ -76,11 +76,14 @@ export async function updateService(input: Pick<BookableService, 'code' | 'name'
   const value = validateService(input, defaults);
   await ensureServicesSchema();
   const updatedAt = Date.now();
-  await database()`UPDATE service_catalog SET
+  const rows = await database()`UPDATE service_catalog SET
     name = ${value.name}, tagline = ${value.tagline}, description = ${value.description}, features = ${JSON.stringify(value.features)},
     price_cents = ${value.priceCents}, duration_minutes = ${value.durationMinutes}, active = ${value.active}, updated_at = ${updatedAt}
-    WHERE code = ${value.code}`;
-  return { ...value, group: defaults.group, groupLabel: defaults.groupLabel, sortOrder: defaults.sortOrder, updatedAt };
+    WHERE code = ${value.code}
+    RETURNING *`;
+  const saved = rows[0] ? mapService(rows[0] as Record<string, unknown>) : null;
+  if (!saved) throw new Error('O serviço não foi encontrado no catálogo. Atualize a página e tente novamente.');
+  return saved;
 }
 
 function validateService(input: Pick<BookableService, 'code' | 'name' | 'tagline' | 'description' | 'features' | 'priceCents' | 'durationMinutes' | 'active'>, defaults: BookableService) {

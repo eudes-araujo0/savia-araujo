@@ -22,7 +22,8 @@ export default function ServiceManager({ services, onChanged }: Props) {
     setSaving(true); setFeedback(null);
     const form = new FormData(event.currentTarget);
     try {
-      const price = Number(String(form.get('price') || '').replace(',', '.'));
+      const price = parseBrazilianCurrency(String(form.get('price') || ''));
+      if (!Number.isFinite(price)) throw new Error('Informe um valor válido. Ex.: 120,00.');
       const response = await fetch('/api/admin/services', {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
@@ -52,7 +53,7 @@ export default function ServiceManager({ services, onChanged }: Props) {
       <div><p className="eyebrow">Catálogo conectado</p><h2>Experiências &<br /><em>valores.</em></h2></div>
       <p>Edite uma única vez. Nome, descrição, itens inclusos, duração e investimento serão usados na vitrine, no agendamento e no cálculo seguro do checkout.</p>
     </section>
-    {feedback && <p className={`admin-feedback ${feedback.kind}`}>{feedback.text}</p>}
+    {feedback && <p className={`admin-feedback ${feedback.kind}`} role="status" aria-live="polite">{feedback.text}</p>}
     <div className="service-manager-groups">
       {groups.map((group) => <section className="service-manager-group" key={group.id}>
         <header><div><small>Categoria</small><h3>{group.label}</h3></div><span>{group.services.filter((item) => item.active).length} publicados</span></header>
@@ -61,7 +62,7 @@ export default function ServiceManager({ services, onChanged }: Props) {
             <div className="service-admin-card-head"><span>{item.code}</span><em><i />{item.active ? 'Publicado' : 'Oculto'}</em></div>
             <h4>{item.name}</h4><p>{item.description}</p>
             <div className="service-admin-data"><span><BadgeDollarSign size={14} /><small>Investimento</small><strong>{money(item.priceCents)}</strong></span><span><Clock3 size={14} /><small>Duração</small><strong>{duration(item.durationMinutes)}</strong></span></div>
-            <button onClick={() => { setFeedback(null); setEditing(item); }}><Pencil size={13} /> Editar experiência</button>
+            <button type="button" onClick={() => { setFeedback(null); setEditing(item); }}><Pencil size={13} /> Editar experiência</button>
           </article>)}
         </div>
       </section>)}
@@ -69,7 +70,7 @@ export default function ServiceManager({ services, onChanged }: Props) {
 
     {editing && <div className="admin-modal-backdrop service-editor-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !saving) setEditing(null); }}>
       <section className="service-editor" role="dialog" aria-modal="true" aria-labelledby="service-editor-title">
-        <header><div><small>{editing.groupLabel} · {editing.code}</small><h2 id="service-editor-title">Editar experiência</h2></div><button aria-label="Fechar" onClick={() => setEditing(null)} disabled={saving}><X size={18} /></button></header>
+        <header><div><small>{editing.groupLabel} · {editing.code}</small><h2 id="service-editor-title">Editar experiência</h2></div><button type="button" aria-label="Fechar" onClick={() => setEditing(null)} disabled={saving}><X size={18} /></button></header>
         <form onSubmit={save}>
           <label><span>Nome exibido</span><input name="name" defaultValue={editing.name} minLength={2} maxLength={80} required /></label>
           <label><span>Chamada curta</span><input name="tagline" defaultValue={editing.tagline} minLength={2} maxLength={100} required /></label>
@@ -78,7 +79,7 @@ export default function ServiceManager({ services, onChanged }: Props) {
           <div className="service-editor-row"><label><span>Valor (R$)</span><input name="price" inputMode="decimal" defaultValue={(editing.priceCents / 100).toFixed(2).replace('.', ',')} required /></label><label><span>Duração (minutos)</span><input name="durationMinutes" type="number" min="30" max="1440" step="15" defaultValue={editing.durationMinutes} required /></label></div>
           <label className="service-active-toggle"><input name="active" type="checkbox" defaultChecked={editing.active} /><span><Power size={14} /><strong>Disponível no site</strong><small>Ao desativar, esta opção desaparece da vitrine e do agendamento.</small></span></label>
           <div className="service-editor-assurance"><Check size={14} /><p>O servidor consulta este valor novamente antes de gerar o pagamento. O preço não pode ser alterado pelo navegador da cliente.</p></div>
-          <footer><button type="button" onClick={() => setEditing(null)}>Cancelar</button><button className="primary" disabled={saving}>{saving ? 'Publicando…' : 'Publicar alterações'}</button></footer>
+          <footer><button type="button" onClick={() => setEditing(null)} disabled={saving}>Cancelar</button><button type="submit" className="primary" disabled={saving}>{saving ? 'Publicando…' : 'Publicar alterações'}</button></footer>
         </form>
       </section>
     </div>}
@@ -87,3 +88,11 @@ export default function ServiceManager({ services, onChanged }: Props) {
 
 function money(cents: number) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(cents / 100); }
 function duration(minutes: number) { const hours = Math.floor(minutes / 60); const rest = minutes % 60; return hours ? `${hours}h${rest ? ` ${rest}min` : ''}` : `${minutes}min`; }
+function parseBrazilianCurrency(value: string) {
+  const normalized = value.trim().replace(/\s/g, '').replace(/^R\$/i, '');
+  if (!normalized) return Number.NaN;
+  const decimal = normalized.includes(',')
+    ? normalized.replace(/\./g, '').replace(',', '.')
+    : normalized;
+  return Number(decimal);
+}
