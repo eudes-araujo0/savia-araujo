@@ -7,7 +7,7 @@ import {
   AlertCircle, ArrowRight, CalendarDays, CheckCircle2, ChevronLeft, ChevronRight,
   CircleDollarSign, Clock3, CreditCard, LayoutDashboard, MessageCircle, ReceiptText,
   RefreshCw, Search, Sparkles, Users, X, Plus, Ban, Trash2, Download, Pencil, Images,
-  Menu, Settings, ShieldCheck, KeyRound,
+  Menu, Settings, ShieldCheck, KeyRound, MailCheck, Send,
 } from 'lucide-react';
 import type { Booking, Expense, ScheduleBlock } from '../../db/schema';
 import { BOOKING_TIMES, SERVICE_CATALOG } from '../../lib/service-catalog';
@@ -315,6 +315,9 @@ function AccountSettings({ username, onChanged }: { username: string; onChanged:
   const [confirmPassword, setConfirmPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+  const [testEmail, setTestEmail] = useState('');
+  const [testBusy, setTestBusy] = useState(false);
+  const [testMessage, setTestMessage] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -341,6 +344,26 @@ function AccountSettings({ username, onChanged }: { username: string; onChanged:
     }
   }
 
+  async function sendEmailTests(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setTestBusy(true);
+    setTestMessage(null);
+    try {
+      const response = await fetch('/api/admin/email-test', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: testEmail }),
+      });
+      const result = await response.json() as { sent?: number; error?: string };
+      if (!response.ok) throw new Error(result.error || 'Não foi possível enviar os testes.');
+      setTestMessage({ kind: 'success', text: `${result.sent || 4} modelos enviados. Confira também as abas Promoções e Spam.` });
+    } catch (error) {
+      setTestMessage({ kind: 'error', text: error instanceof Error ? error.message : 'Não foi possível enviar os testes.' });
+    } finally {
+      setTestBusy(false);
+    }
+  }
+
   return <div className="account-settings">
     <section className="account-settings-hero">
       <div><p className="eyebrow">Proprietária do painel</p><h2>Seu acesso,<br /><em>sob seu controle.</em></h2></div>
@@ -364,6 +387,10 @@ function AccountSettings({ username, onChanged }: { username: string; onChanged:
         <ol><li><strong>O acesso atual é substituído</strong><span>O usuário temporário deixa de funcionar.</span></li><li><strong>Outros dispositivos são desconectados</strong><span>Somente esta sessão continua ativa.</span></li><li><strong>A senha não fica visível</strong><span>O banco guarda apenas um hash seguro.</span></li></ol>
       </aside>
     </div>
+    <section className="email-test-card">
+      <div className="email-test-copy"><MailCheck size={23} /><div><small>Resend · ambiente de teste</small><h3>Veja os e-mails antes de oficializar.</h3><p>Envia os quatro modelos de pagamento: cliente e proprietária, com sinal de 50% e valor integral. Sem domínio verificado, use o mesmo e-mail cadastrado na sua conta Resend.</p></div></div>
+      <form onSubmit={sendEmailTests}><label><span>E-mail da conta Resend</span><input type="email" autoComplete="email" placeholder="seuemail@exemplo.com" value={testEmail} onChange={(event) => setTestEmail(event.target.value)} maxLength={254} required /></label><button type="submit" disabled={testBusy}><Send size={14} />{testBusy ? 'Enviando 4 modelos…' : 'Enviar e-mails de teste'}</button>{testMessage && <p className={`account-message ${testMessage.kind}`} role="status">{testMessage.text}</p>}</form>
+    </section>
   </div>;
 }
 

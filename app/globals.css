@@ -955,6 +955,18 @@ img.managed-media, video.managed-media {
 .account-notes strong, .account-notes span { display: block; }
 .account-notes strong { font-size: 9px; }
 .account-notes span { margin-top: 5px; color: #8b8175; font-size: 8px; line-height: 1.55; }
+.email-test-card { display: grid; grid-template-columns: minmax(0,1.1fr) minmax(300px,.9fr); align-items: center; gap: 45px; margin-top: 16px; border: 1px solid #ded7cc; background: #fbfaf7; padding: 27px 29px; }
+.email-test-copy { display: flex; align-items: flex-start; gap: 15px; color: #a57935; }
+.email-test-copy small { color: #a57935; font-size: 7px; font-weight: 800; letter-spacing: .13em; text-transform: uppercase; }
+.email-test-copy h3 { margin: 5px 0 7px; color: #201d18; font-family: var(--font-display), serif; font-size: 26px; font-weight: 600; }
+.email-test-copy p { max-width: 610px; margin: 0; color: #857a6e; font-size: 9px; line-height: 1.65; }
+.email-test-card form label { display: grid; gap: 7px; }
+.email-test-card form label span { color: #72685c; font-size: 7px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.email-test-card form input { width: 100%; border: 1px solid #d8d0c4; outline: 0; background: #fff; padding: 12px 13px; color: #1d1a16; font-size: 10px; }
+.email-test-card form input:focus { border-color: #a77c38; box-shadow: 0 0 0 3px rgba(167,124,56,.1); }
+.email-test-card form > button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; border: 1px solid #171510; background: #171510; padding: 12px 16px; cursor: pointer; color: var(--gold); font-size: 8px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
+.email-test-card form > button:disabled { cursor: wait; opacity: .55; }
+.email-test-card .account-message { margin-top: 10px; }
 
 @media (max-width: 760px) {
   .admin-page { display: block; }
@@ -962,9 +974,9 @@ img.managed-media, video.managed-media {
   .admin-sidebar-head { height: 68px; margin: 0; }
   .admin-sidebar .brand { margin: 0; }
   .admin-menu-toggle { display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid rgba(205,167,93,.28); background: rgba(255,255,255,.04); cursor: pointer; color: var(--gold); }
-  .admin-sidebar-content { position: fixed; z-index: 122; top: 68px; right: 0; bottom: 0; width: min(86vw, 350px); overflow-y: auto; border-left: 1px solid rgba(205,167,93,.18); background: radial-gradient(circle at 20% 5%, #2b2218 0, #12100d 28%, #090908 78%); padding: 25px 21px 30px; box-shadow: -25px 0 65px rgba(0,0,0,.35); transform: translateX(105%); transition: transform .28s ease; }
+  .admin-sidebar-content { position: fixed; z-index: 122; top: 68px; right: 0; bottom: 0; width: min(88vw, 360px); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; border-left: 1px solid rgba(205,167,93,.22); background: radial-gradient(circle at 20% 5%, #2b2218 0, #12100d 28%, #090908 78%); padding: 25px 21px calc(34px + env(safe-area-inset-bottom)); box-shadow: -25px 0 65px rgba(0,0,0,.46); transform: translateX(105%); transition: transform .28s ease; }
   .admin-sidebar-content.open { transform: translateX(0); }
-  .admin-menu-overlay { position: fixed; z-index: 121; inset: 68px 0 0; display: block; border: 0; background: rgba(5,4,3,.6); backdrop-filter: blur(3px); }
+  .admin-menu-overlay { position: fixed; z-index: 119; inset: 68px 0 0; display: block; border: 0; background: rgba(5,4,3,.64); backdrop-filter: blur(3px); }
   .admin-nav-label { display: block; }
   .admin-nav { display: grid; overflow: visible; }
   .admin-nav button { width: 100%; flex: none; white-space: normal; }
@@ -980,4 +992,6 @@ img.managed-media, video.managed-media {
   .account-settings-grid { grid-template-columns: 1fr; }
   .account-form, .account-notes { padding: 22px 19px; }
   .account-password-row { grid-template-columns: 1fr; gap: 0; }
+  .email-test-card { grid-template-columns: 1fr; gap: 22px; padding: 22px 19px; }
+  .email-test-card form > button { width: 100%; }
 }

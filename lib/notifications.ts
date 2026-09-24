@@ -80,6 +80,68 @@ export async function notifyBooking(booking: Booking, kind: NotificationKind, ma
   };
 }
 
+export async function sendResendTestSuite(to: string) {
+  const apiKey = runtimeValue('RESEND_API_KEY');
+  if (!apiKey) throw new Error('RESEND_API_KEY não está configurada na Vercel.');
+  const siteUrl = safeSiteUrl(runtimeValue('NEXT_PUBLIC_SITE_URL')) || 'https://savia-araujo.vercel.app';
+  const base: Booking = {
+    id: 'TESTE-EMAIL',
+    createdAt: Date.now(),
+    clientName: 'Cliente Demonstração',
+    whatsapp: '(81) 99999-9999',
+    email: to,
+    service: 'make-social',
+    serviceLabel: 'Make Social',
+    appointmentDate: testDate(),
+    appointmentTime: '15:00',
+    durationMinutes: 90,
+    priceCents: 12000,
+    depositCents: 6000,
+    balanceCents: 6000,
+    paymentOption: 'deposit',
+    paymentAmountCents: 6000,
+    balancePaidCents: 0,
+    status: 'confirmado',
+    paymentStatus: 'pago',
+    paymentProvider: 'infinitepay',
+    paymentPreferenceId: null,
+    paymentId: 'IP-TESTE-2026',
+    paymentUrl: null,
+    paymentReceiptUrl: null,
+    paidAt: Date.now(),
+    balancePaidAt: null,
+    expiresAt: null,
+    consentAt: Date.now(),
+    notes: 'Teste visual dos e-mails antes da publicação oficial.',
+    receiptKey: null,
+    receiptName: null,
+  };
+  const full: Booking = { ...base, id: 'TESTE-INTEGRAL', paymentOption: 'full', paymentAmountCents: 12000, balanceCents: 0 };
+  const examples: { booking: Booking; recipient: Recipient; label: string }[] = [
+    { booking: base, recipient: 'client', label: 'Cliente · sinal de 50%' },
+    { booking: full, recipient: 'client', label: 'Cliente · pagamento integral' },
+    { booking: base, recipient: 'owner', label: 'Proprietária · venda com sinal' },
+    { booking: full, recipient: 'owner', label: 'Proprietária · venda integral' },
+  ];
+
+  await Promise.all(examples.map(async (example) => {
+    const content = notificationContent(example.booking, 'payment_approved', `${siteUrl}/reserva/${example.booking.id}`);
+    const response = await sendResend({
+      apiKey,
+      to,
+      subject: `[TESTE] ${example.label} — ${example.recipient === 'owner' ? content.ownerSubject : content.clientSubject}`,
+      text: example.recipient === 'owner' ? content.ownerText : content.clientText,
+      html: emailHtml(example.booking, 'payment_approved', example.recipient, `${siteUrl}/reserva/${example.booking.id}`),
+      idempotencyKey: `savia/test/${crypto.randomUUID()}`,
+    });
+    if (!response.ok) {
+      const details = await response.text().catch(() => `HTTP ${response.status}`);
+      throw new Error(resendError(details, response.status));
+    }
+  }));
+  return { sent: examples.length };
+}
+
 async function deliverOnce(bookingId: string, deliveryKind: string, deliver: () => Promise<Response>) {
   const deliveryId = await reserveNotification(bookingId, deliveryKind);
   if (!deliveryId) return true;
@@ -106,7 +168,7 @@ async function sendResend(input: { apiKey: string; to: string; subject: string; 
       'idempotency-key': input.idempotencyKey,
     },
     body: JSON.stringify({
-      from: runtimeValue('NOTIFICATION_FROM_EMAIL') || 'Sávia Araújo <agendamento@resend.dev>',
+      from: runtimeValue('NOTIFICATION_FROM_EMAIL') || 'Sávia Araújo <onboarding@resend.dev>',
       to: [input.to],
       subject: input.subject,
       text: input.text,
@@ -268,4 +330,17 @@ async function sign(payload: string, secret: string) {
 function formatDate(value: string) {
   const [year, month, day] = value.split('-');
   return `${day}/${month}/${year}`;
+}
+
+function testDate() {
+  const date = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
+}
+
+function resendError(details: string, status: number) {
+  try {
+    const parsed = JSON.parse(details) as { message?: string };
+    if (parsed.message) return `Resend: ${parsed.message}`;
+  } catch { /* resposta não estruturada */ }
+  return `O Resend recusou o teste (HTTP ${status}). Sem domínio, use o e-mail da própria conta Resend como destinatário.`;
 }

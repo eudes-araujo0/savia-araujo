@@ -107,6 +107,8 @@ Somente a sessão master recebe autorização temporária de upload. Os arquivos
 
 ### Ativar os e-mails do Resend
 
+É possível validar o desenho dos e-mails antes de comprar ou conectar um domínio. Cadastre apenas `RESEND_API_KEY`, deixe `NOTIFICATION_FROM_EMAIL` vazio (o sistema usará `Sávia Araújo <onboarding@resend.dev>`) e abra **Painel > Acesso e segurança > Resend · ambiente de teste**. Informe o mesmo e-mail usado na conta Resend e envie os quatro modelos. Esse modo serve somente para testes; o envio para clientes reais exige um domínio verificado.
+
 1. crie uma conta no Resend e adicione um domínio ou subdomínio de envio, preferencialmente `mail.seudominio.com.br`;
 2. publique no DNS os registros SPF e DKIM mostrados pelo Resend e aguarde o status **Verified**;
 3. crie uma API key de envio e salve-a na Vercel como `RESEND_API_KEY`;
