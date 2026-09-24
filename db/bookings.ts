@@ -214,6 +214,57 @@ export async function getBookingAvailability(appointmentDate: string, requestedS
       WHERE status = 'pendente' AND payment_status IN ('aguardando', 'configuracao_pendente') AND expires_at IS NOT NULL AND expires_at <= ${now}`,
   ]);
   const duration = requestedDuration || fallbackService?.durationMinutes || 90;
+  return calculateAvailability(appointmentDate, requestedService, duration, schedule, rows, blocks);
+}
+
+export async function getMonthBookingAvailability(month: string, requestedService = '', requestedDuration?: number) {
+  await ensureBookingsSchema();
+  const sql = database();
+  const firstDate = `${month}-01`;
+  const lastDay = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
+  const lastDate = `${month}-${String(lastDay).padStart(2, '0')}`;
+  const now = Date.now();
+  const [schedule, fallbackService, rows, blocks] = await Promise.all([
+    getBusinessSchedule(),
+    requestedDuration ? Promise.resolve(null) : getService(requestedService, true),
+    sql`SELECT appointment_date, appointment_time, service, duration_minutes FROM bookings
+      WHERE appointment_date BETWEEN ${firstDate} AND ${lastDate}
+        AND status NOT IN ('cancelado', 'expirado')
+        AND NOT (status = 'pendente' AND payment_status IN ('aguardando', 'configuracao_pendente') AND expires_at IS NOT NULL AND expires_at <= ${now})`,
+    sql`SELECT block_date, start_time, end_time FROM schedule_blocks WHERE block_date BETWEEN ${firstDate} AND ${lastDate}`,
+    sql`UPDATE bookings SET status = 'expirado', payment_status = 'expirado'
+      WHERE status = 'pendente' AND payment_status IN ('aguardando', 'configuracao_pendente') AND expires_at IS NOT NULL AND expires_at <= ${now}`,
+  ]);
+  const duration = requestedDuration || fallbackService?.durationMinutes || 90;
+  const days: Record<string, ReturnType<typeof calculateAvailability>> = {};
+  const cursor = new Date(`${firstDate}T12:00:00Z`);
+  const end = new Date(`${lastDate}T12:00:00Z`);
+  const today = todayInSaoPaulo();
+  while (cursor <= end) {
+    const date = cursor.toISOString().slice(0, 10);
+    if (date >= today) {
+      days[date] = calculateAvailability(
+        date,
+        requestedService,
+        duration,
+        schedule,
+        rows.filter((row) => String(row.appointment_date) === date),
+        blocks.filter((block) => String(block.block_date) === date),
+      );
+    }
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
+  }
+  return days;
+}
+
+function calculateAvailability(
+  appointmentDate: string,
+  requestedService: string,
+  duration: number,
+  schedule: Awaited<ReturnType<typeof getBusinessSchedule>>,
+  rows: Record<string, unknown>[],
+  blocks: Record<string, unknown>[],
+) {
   const times = buildScheduleTimes(schedule, appointmentDate, duration);
   if (!isBusinessDay(schedule, appointmentDate)) return { times: [], unavailable: [], closed: true };
   if (blocks.some((block) => !block.start_time || !block.end_time) || (isBridalService(requestedService) && rows.length > 0) || rows.some((row) => isBridalService(String(row.service)))) {

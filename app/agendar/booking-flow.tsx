@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight, CreditCard, ShieldCheck } from 'lucide-react';
@@ -24,6 +24,8 @@ type BookingData = {
   consent: boolean;
 };
 
+type AvailabilityResult = { times: string[]; unavailable: string[]; closed: boolean };
+
 const initialData: BookingData = { service: '', date: '', time: '', name: '', whatsapp: '', email: '', notes: '', paymentOption: 'deposit', consent: false };
 
 type Props = { initialMedia: SiteMediaValue[]; initialServices: BookableService[]; initialSchedule: BusinessSchedule; initialService: string; initialPayment: string; initialBooking: string; initialToken: string; initialTransactionNsu: string; initialSlug: string; initialReceiptUrl: string };
@@ -42,6 +44,8 @@ export default function BookingFlow({ initialMedia, initialServices: services, i
   const [unavailableTimes, setUnavailableTimes] = useState<string[]>([]);
   const [availabilityClosed, setAvailabilityClosed] = useState(false);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [availabilityByDate, setAvailabilityByDate] = useState<Record<string, AvailabilityResult>>({});
+  const requestedMonths = useRef(new Set<string>());
   const [paymentUrl, setPaymentUrl] = useState<string | null>(null);
   const [paymentAmountCents, setPaymentAmountCents] = useState(0);
   const [paymentNotice, setPaymentNotice] = useState('');
@@ -69,6 +73,8 @@ export default function BookingFlow({ initialMedia, initialServices: services, i
 
   useEffect(() => {
     if (!data.date || !data.service) return;
+    const cached = availabilityByDate[data.date];
+    if (cached) return;
     let active = true;
     fetch(`/api/bookings/availability?date=${encodeURIComponent(data.date)}&service=${encodeURIComponent(data.service)}`)
       .then(async (response) => {
@@ -82,15 +88,37 @@ export default function BookingFlow({ initialMedia, initialServices: services, i
         setTimes(result.times || []);
         setUnavailableTimes(unavailable);
         setAvailabilityClosed(Boolean(result.closed));
+        setAvailabilityByDate((current) => ({ ...current, [data.date]: { times: result.times || [], unavailable, closed: Boolean(result.closed) } }));
         setData((current) => unavailable.includes(current.time) ? { ...current, time: '' } : current);
       })
       .catch((requestError) => { if (active) { setTimes([]); setUnavailableTimes([]); setError(requestError instanceof Error ? requestError.message : 'Não foi possível consultar a agenda.'); } })
       .finally(() => { if (active) setAvailabilityLoading(false); });
     return () => { active = false; };
-  }, [data.date, data.service]);
+  }, [data.date, data.service, availabilityByDate]);
+
+  useEffect(() => {
+    if (!data.service) return;
+    const month = calendarMonth.slice(0, 7);
+    const cacheKey = `${data.service}:${month}`;
+    if (requestedMonths.current.has(cacheKey)) return;
+    requestedMonths.current.add(cacheKey);
+    fetch(`/api/bookings/availability?month=${encodeURIComponent(month)}&service=${encodeURIComponent(data.service)}`)
+      .then(async (response) => {
+        const result = await response.json() as { days?: Record<string, AvailabilityResult>; error?: string };
+        if (!response.ok) throw new Error(result.error || 'Não foi possível preparar a agenda.');
+        return result.days || {};
+      })
+      .then((days) => setAvailabilityByDate((current) => ({ ...current, ...days })))
+      .catch(() => requestedMonths.current.delete(cacheKey));
+  }, [calendarMonth, data.service]);
 
   const selectedService = useMemo(() => services.find((service) => service.code === data.service), [data.service, services]);
   const calendarDays = useMemo(() => buildCalendarDays(calendarMonth, today, initialSchedule.openDays), [calendarMonth, today, initialSchedule.openDays]);
+  const cachedAvailability = data.date ? availabilityByDate[data.date] : undefined;
+  const displayedTimes = cachedAvailability?.times || times;
+  const displayedUnavailableTimes = cachedAvailability?.unavailable || unavailableTimes;
+  const displayedAvailabilityClosed = cachedAvailability?.closed ?? availabilityClosed;
+  const displayedAvailabilityLoading = Boolean(data.date && !cachedAvailability && availabilityLoading);
 
   function nextStep() {
     setError('');
@@ -161,7 +189,7 @@ export default function BookingFlow({ initialMedia, initialServices: services, i
                   <p className="service-group-title">Escolha uma opção</p>
                   <div className="service-options">
                     {services.filter((service) => service.group === activeGroup).map((service) => (
-                      <button type="button" key={service.code} className={`service-option ${data.service === service.code ? 'selected' : ''}`} onClick={() => { setTimes([]); setUnavailableTimes([]); setAvailabilityClosed(false); setAvailabilityLoading(false); setData({ ...data, service: service.code, date: '', time: '' }); }} aria-pressed={data.service === service.code}>
+                      <button type="button" key={service.code} className={`service-option ${data.service === service.code ? 'selected' : ''}`} onClick={() => { setTimes([]); setUnavailableTimes([]); setAvailabilityByDate({}); setAvailabilityClosed(false); setAvailabilityLoading(false); setData({ ...data, service: service.code, date: '', time: '' }); }} aria-pressed={data.service === service.code}>
                         <div><h3>{service.name}</h3><p>{service.tagline} · {service.description}</p></div>
                         <strong>{money(service.priceCents)}</strong>
                       </button>
@@ -193,12 +221,13 @@ export default function BookingFlow({ initialMedia, initialServices: services, i
                       {calendarDays.map((day) => day.hidden
                         ? <span className="booking-calendar-empty" key={day.date} aria-hidden="true" />
                         : <button type="button" key={day.date} className={data.date === day.date ? 'selected' : ''} disabled={day.disabled} aria-label={longCalendarDate(day.date)} aria-pressed={data.date === day.date} onClick={() => {
-                          const previewTimes = selectedService ? buildScheduleTimes(initialSchedule, day.date, selectedService.durationMinutes) : [];
+                          const cached = availabilityByDate[day.date];
+                          const previewTimes = cached?.times || (selectedService ? buildScheduleTimes(initialSchedule, day.date, selectedService.durationMinutes) : []);
                           setError('');
                           setTimes(previewTimes);
-                          setUnavailableTimes(previewTimes);
-                          setAvailabilityClosed(false);
-                          setAvailabilityLoading(true);
+                          setUnavailableTimes(cached?.unavailable || previewTimes);
+                          setAvailabilityClosed(cached?.closed || false);
+                          setAvailabilityLoading(!cached);
                           setData({ ...data, date: day.date, time: '' });
                         }}>{day.day}</button>)}
                     </div>
@@ -208,12 +237,12 @@ export default function BookingFlow({ initialMedia, initialServices: services, i
                 <div className="form-field full">
                   <label>Horário de preferência</label>
                   <div className="time-grid">
-                    {times.map((time) => <button type="button" key={time} disabled={availabilityLoading || unavailableTimes.includes(time)} className={`time-option ${availabilityLoading ? 'checking' : ''} ${data.time === time ? 'selected' : ''}`} onClick={() => setData({ ...data, time })}>{time}{availabilityLoading ? <small>verificando</small> : unavailableTimes.includes(time) ? <small>indisponível</small> : null}</button>)}
+                    {displayedTimes.map((time) => <button type="button" key={time} disabled={displayedAvailabilityLoading || displayedUnavailableTimes.includes(time)} className={`time-option ${displayedAvailabilityLoading ? 'checking' : ''} ${data.time === time ? 'selected' : ''}`} onClick={() => setData({ ...data, time })}>{time}{displayedAvailabilityLoading ? <small>verificando</small> : displayedUnavailableTimes.includes(time) ? <small>indisponível</small> : null}</button>)}
                   </div>
                   {!data.date && <p className="availability-feedback">Escolha uma data para ver os horários.</p>}
-                  {availabilityLoading && <p className="availability-feedback">Consultando a agenda...</p>}
-                  {data.date && availabilityClosed && <p className="availability-feedback warning">Não há atendimento neste dia da semana.</p>}
-                  {data.date && !availabilityClosed && !availabilityLoading && times.length > 0 && times.every((time) => unavailableTimes.includes(time)) && <p className="availability-feedback warning">Não há mais horários disponíveis nesta data.</p>}
+                  {displayedAvailabilityLoading && <p className="availability-feedback">Consultando a agenda...</p>}
+                  {data.date && displayedAvailabilityClosed && <p className="availability-feedback warning">Não há atendimento neste dia da semana.</p>}
+                  {data.date && !displayedAvailabilityClosed && !displayedAvailabilityLoading && displayedTimes.length > 0 && displayedTimes.every((time) => displayedUnavailableTimes.includes(time)) && <p className="availability-feedback warning">Não há mais horários disponíveis nesta data.</p>}
                 </div>
               </div>
             </div>
