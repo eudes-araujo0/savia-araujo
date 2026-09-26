@@ -1,12 +1,12 @@
 'use client';
 
-import { useLayoutEffect, useRef, useState } from 'react';
-import Image from 'next/image';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import Image, { getImageProps } from 'next/image';
 import { ArrowDownRight, ArrowUpRight, Check, Instagram, MoveRight, Sparkles } from 'lucide-react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { useSiteMedia } from '../lib/use-site-media';
-import { managedMediaStyle, type SiteMediaValue } from '../lib/site-media';
+import { managedArtDirectionStyle, managedMediaStyle, type SiteMediaValue } from '../lib/site-media';
 import type { BookableService } from '../lib/service-catalog';
 
 gsap.registerPlugin(ScrollTrigger);
@@ -187,6 +187,8 @@ export default function HomeClient({ initialMedia, initialServices }: { initialM
   }, []);
 
   const visiblePortfolio = filter === 'todos' ? portfolio : portfolio.filter((item) => item.category === filter);
+  const heroDesktop = getMedia('home.hero-desktop');
+  const heroMobile = getMedia('home.hero-mobile');
 
   return (
     <main ref={scope}>
@@ -203,8 +205,7 @@ export default function HomeClient({ initialMedia, initialServices }: { initialM
 
       <section className="hero" id="inicio">
         <div className="hero-media">
-          <Image className="hero-image hero-image-desktop managed-media" src={getMedia('home.hero-desktop').url} alt={getMedia('home.hero-desktop').alt} fill sizes="100vw" preload style={managedMediaStyle(getMedia('home.hero-desktop'))} />
-          <Image className="hero-image hero-image-mobile managed-media" src={getMedia('home.hero-mobile').url} alt={getMedia('home.hero-mobile').alt} fill sizes="100vw" preload style={managedMediaStyle(getMedia('home.hero-mobile'))} />
+          <ArtDirectedImage className="hero-image managed-media" desktop={heroDesktop} mobile={heroMobile} desktopSize={{ width: 3840, height: 2160 }} mobileSize={{ width: 1440, height: 1920 }} sizes="100vw" fetchPriority="high" />
         </div>
         <div className="hero-shade" />
         <div className="hero-copy">
@@ -253,11 +254,17 @@ export default function HomeClient({ initialMedia, initialServices }: { initialM
           {visiblePortfolio.map((item, index) => (
             <article className={`portfolio-card ${item.size}`} key={item.title} data-reveal>
               {item.type === 'video' ? (
-                <video className="managed-media" src={item.src} poster={getMedia(item.posterSlot || item.slot).url} aria-label={getMedia(item.posterSlot || item.slot).alt} autoPlay muted loop playsInline controls preload="metadata" style={managedMediaStyle(getMedia(item.posterSlot || item.slot))} />
+                <>
+                  <Image className="managed-media portfolio-video-poster" src={getMedia(item.posterSlot || item.slot).url} alt={getMedia(item.posterSlot || item.slot).alt} fill sizes="(max-width: 760px) 100vw, 35vw" quality={100} style={managedMediaStyle(getMedia(item.posterSlot || item.slot))} />
+                  <LazyPortfolioVideo src={item.src} label={getMedia(item.posterSlot || item.slot).alt} style={managedMediaStyle(getMedia(item.posterSlot || item.slot))} />
+                </>
               ) : (
                 <>
-                  <Image className={`managed-media ${item.mobileSrc ? 'portfolio-image-desktop' : ''}`} src={getMedia(item.slot).url} alt={getMedia(item.slot).alt} fill sizes="(max-width: 760px) 100vw, (max-width: 1050px) 50vw, 35vw" style={managedMediaStyle(getMedia(item.slot))} />
-                  {item.mobileSrc && <Image className="portfolio-image-mobile managed-media" src={getMedia(item.mobileSlot || item.slot).url} alt={getMedia(item.mobileSlot || item.slot).alt} fill sizes="100vw" style={managedMediaStyle(getMedia(item.mobileSlot || item.slot))} />}
+                  {item.mobileSrc ? (
+                    <ArtDirectedImage className="managed-media" desktop={getMedia(item.slot)} mobile={getMedia(item.mobileSlot || item.slot)} desktopSize={{ width: 1800, height: 2400 }} mobileSize={{ width: 1600, height: 2000 }} sizes="(max-width: 760px) 100vw, (max-width: 1050px) 50vw, 35vw" />
+                  ) : (
+                    <Image className="managed-media" src={getMedia(item.slot).url} alt={getMedia(item.slot).alt} fill sizes="(max-width: 760px) 100vw, (max-width: 1050px) 50vw, 35vw" quality={100} style={managedMediaStyle(getMedia(item.slot))} />
+                  )}
                 </>
               )}
               <div className="portfolio-overlay"><span>{String(index + 1).padStart(2, '0')}</span><h3>{item.title}</h3><ArrowUpRight size={22} /></div>
@@ -298,7 +305,7 @@ export default function HomeClient({ initialMedia, initialServices }: { initialM
             </div>
           </div>
           <figure className="bridal-image" data-reveal>
-            <Image className="managed-media" src={getMedia('experience.bridal').url} alt={getMedia('experience.bridal').alt} fill sizes="(max-width: 760px) 100vw, 50vw" style={managedMediaStyle(getMedia('experience.bridal'))} />
+            <Image className="managed-media" src={getMedia('experience.bridal').url} alt={getMedia('experience.bridal').alt} fill sizes="(max-width: 760px) 100vw, 50vw" quality={100} style={managedMediaStyle(getMedia('experience.bridal'))} />
             <figcaption>Uma preparação pensada para você viver o momento.</figcaption>
           </figure>
         </div>
@@ -317,8 +324,8 @@ export default function HomeClient({ initialMedia, initialServices }: { initialM
 
       <section className="boss-section" id="boss">
         <div className="boss-visual" data-reveal>
-          <Image className="boss-primary managed-media" src={getMedia('experience.boss-primary').url} alt={getMedia('experience.boss-primary').alt} width={2516} height={3840} sizes="(max-width: 760px) 82vw, 38vw" quality={95} style={managedMediaStyle(getMedia('experience.boss-primary'))} />
-          <Image className="boss-secondary managed-media" src={getMedia('experience.boss-secondary').url} alt={getMedia('experience.boss-secondary').alt} width={2561} height={3840} sizes="(max-width: 760px) 45vw, 22vw" quality={95} style={managedMediaStyle(getMedia('experience.boss-secondary'))} />
+          <Image className="boss-primary managed-media" src={getMedia('experience.boss-primary').url} alt={getMedia('experience.boss-primary').alt} width={2516} height={3840} sizes="(max-width: 760px) 82vw, 38vw" quality={100} style={managedMediaStyle(getMedia('experience.boss-primary'))} />
+          <Image className="boss-secondary managed-media" src={getMedia('experience.boss-secondary').url} alt={getMedia('experience.boss-secondary').alt} width={2561} height={3840} sizes="(max-width: 760px) 45vw, 22vw" quality={100} style={managedMediaStyle(getMedia('experience.boss-secondary'))} />
           <span className="boss-monogram">BOSS</span>
         </div>
         <div className="boss-content" data-reveal>
@@ -346,7 +353,7 @@ export default function HomeClient({ initialMedia, initialServices }: { initialM
 
       <section className="about-section" id="sobre">
         <div className="about-image-wrap" data-reveal>
-          <Image className="managed-media" src={getMedia('home.about').url} alt={getMedia('home.about').alt} fill sizes="(max-width: 760px) 100vw, 50vw" style={managedMediaStyle(getMedia('home.about'))} />
+          <Image className="managed-media" src={getMedia('home.about').url} alt={getMedia('home.about').alt} fill sizes="(max-width: 760px) 100vw, 50vw" quality={100} style={managedMediaStyle(getMedia('home.about'))} />
           <div className="about-stamp"><span>+</span><strong>2018</strong><small>beleza com<br />propósito</small></div>
         </div>
         <div className="about-copy" data-reveal>
@@ -361,11 +368,11 @@ export default function HomeClient({ initialMedia, initialServices }: { initialM
       <section className="testimonial-section">
         <p className="eyebrow" data-reveal>Manifesto</p>
         <blockquote data-reveal>Não é sobre se tornar outra pessoa.<br /><em>É sobre reconhecer a potência que já existe em você.</em></blockquote>
-        <div className="testimonial-author" data-reveal><span className="testimonial-avatar"><Image className="managed-media" src={getMedia('home.manifesto').url} alt={getMedia('home.manifesto').alt} fill sizes="42px" style={managedMediaStyle(getMedia('home.manifesto'))} /></span><p><strong>Sávia Araújo</strong><small>Beauty with intention</small></p></div>
+        <div className="testimonial-author" data-reveal><span className="testimonial-avatar"><Image className="managed-media" src={getMedia('home.manifesto').url} alt={getMedia('home.manifesto').alt} fill sizes="42px" quality={100} style={managedMediaStyle(getMedia('home.manifesto'))} /></span><p><strong>Sávia Araújo</strong><small>Beauty with intention</small></p></div>
       </section>
 
       <section className="closing-cta">
-        <div className="closing-cta-media" aria-hidden="true"><Image className="managed-media" src={getMedia('home.closing').url} alt="" fill sizes="100vw" style={managedMediaStyle(getMedia('home.closing'))} /></div>
+        <div className="closing-cta-media" aria-hidden="true"><Image className="managed-media" src={getMedia('home.closing').url} alt="" fill sizes="100vw" quality={100} style={managedMediaStyle(getMedia('home.closing'))} /></div>
         <div data-reveal>
           <p className="eyebrow">Seu momento começa aqui</p>
           <h2>Qual experiência<br /><em>combina com você?</em></h2>
@@ -387,3 +394,44 @@ export default function HomeClient({ initialMedia, initialServices }: { initialM
 }
 
 function money(cents: number) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 }).format(cents / 100); }
+
+function ArtDirectedImage({ className, desktop, mobile, desktopSize, mobileSize, sizes, fetchPriority }: {
+  className: string;
+  desktop: SiteMediaValue;
+  mobile: SiteMediaValue;
+  desktopSize: { width: number; height: number };
+  mobileSize: { width: number; height: number };
+  sizes: string;
+  fetchPriority?: 'high' | 'low' | 'auto';
+}) {
+  const common = { alt: desktop.alt, sizes, quality: 100, fetchPriority } as const;
+  const { props: { srcSet: desktopSrcSet } } = getImageProps({ ...common, src: desktop.url, ...desktopSize });
+  const { props: { srcSet: mobileSrcSet, alt, ...imageProps } } = getImageProps({ ...common, alt: mobile.alt || desktop.alt, src: mobile.url, ...mobileSize });
+  return (
+    <picture className="art-directed-picture">
+      <source media="(min-width: 761px)" srcSet={desktopSrcSet} />
+      <source media="(max-width: 760px)" srcSet={mobileSrcSet} />
+      <img {...imageProps} alt={alt} className={className} style={managedArtDirectionStyle(desktop, mobile)} />
+    </picture>
+  );
+}
+
+function LazyPortfolioVideo({ src, label, style }: { src: string; label: string; style: CSSProperties }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [active, setActive] = useState(false);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      setActive(true);
+      observer.disconnect();
+    }, { rootMargin: '250px' });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return <video ref={ref} className={`managed-media lazy-portfolio-video${ready ? ' ready' : ''}`} src={active ? src : undefined} aria-label={label} autoPlay={active} muted loop playsInline controls preload="none" onCanPlay={() => setReady(true)} style={style} />;
+}

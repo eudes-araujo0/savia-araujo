@@ -4,6 +4,7 @@ import { getAdminSession } from '../../../../lib/admin-auth';
 import { reconcileInfinitePayBooking } from '../../../../lib/payment-reconciliation';
 import { isSameOriginRequest } from '../../../../lib/request-security';
 import { notifyBooking } from '../../../../lib/notifications';
+import { isBookingId } from '../../../../lib/booking-validation';
 
 type ReconcileRequest = {
   bookingId?: string;
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
   }
   const bookingId = body.bookingId?.trim() || '';
   const action = body.action || 'sync';
-  if (!/^SAV-\d{8}-[A-Z0-9]{6}$/.test(bookingId) || action !== 'sync') {
+  if (!isBookingId(bookingId) || action !== 'sync') {
     return NextResponse.json({ error: 'Dados de pagamento inválidos.' }, { status: 400 });
   }
 

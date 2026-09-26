@@ -1,6 +1,7 @@
 import type { BusinessSchedule } from '../db/schema';
 
 export const SAO_PAULO_TIME_ZONE = 'America/Sao_Paulo';
+export const MAX_BOOKING_MONTHS_AHEAD = 24;
 
 export function buildScheduleTimes(schedule: BusinessSchedule, date: string, durationMinutes: number) {
   if (!isBusinessDay(schedule, date)) return [];
@@ -23,6 +24,20 @@ export function isPastScheduleTime(date: string, time: string) {
 
 export function todayInSaoPaulo() {
   return saoPauloNow().date;
+}
+
+export function maximumBookingDate(today = todayInSaoPaulo()) {
+  if (!isValidIsoDate(today)) throw new Error('Data de referência inválida.');
+  const [year, month, day] = today.split('-').map(Number);
+  const targetMonthIndex = month - 1 + MAX_BOOKING_MONTHS_AHEAD;
+  const targetYear = year + Math.floor(targetMonthIndex / 12);
+  const targetMonth = targetMonthIndex % 12;
+  const lastDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate();
+  return `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}-${String(Math.min(day, lastDay)).padStart(2, '0')}`;
+}
+
+export function isBookableDate(value: string, today = todayInSaoPaulo()) {
+  return isValidIsoDate(value) && value >= today && value <= maximumBookingDate(today);
 }
 
 export function isValidIsoDate(value: string) {

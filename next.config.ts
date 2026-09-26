@@ -5,9 +5,12 @@ const nextConfig: NextConfig = {
   outputFileTracingRoot: process.cwd(),
   turbopack: { root: process.cwd() },
   images: {
-    // Preserve the photographer's original pixels. Site images are served
-    // directly from their source instead of being re-encoded by Next/Vercel.
-    unoptimized: true,
+    // Keep the original in Blob/storage, while delivering a responsive copy
+    // at maximum quality for each screen instead of the full 4K file to all.
+    qualities: [100],
+    formats: ['image/webp'],
+    minimumCacheTTL: 2_678_400,
+    maximumRedirects: 0,
     remotePatterns: [{ protocol: 'https', hostname: '**.public.blob.vercel-storage.com' }],
   },
   async headers() {

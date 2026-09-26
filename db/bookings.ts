@@ -1,7 +1,8 @@
 import type { Booking, Expense, ScheduleBlock } from './schema';
 import { decryptSensitive, encryptSensitive } from '../lib/data-crypto';
 import { isBridalService } from '../lib/service-catalog';
-import { buildScheduleTimes, isBusinessDay, isPastScheduleTime, todayInSaoPaulo } from '../lib/business-hours';
+import { buildScheduleTimes, isBusinessDay, isPastScheduleTime, maximumBookingDate, todayInSaoPaulo } from '../lib/business-hours';
+import { BookingAvailabilityError } from '../lib/booking-validation';
 import { getService } from './services';
 import { getBusinessSchedule } from './schedule';
 import { database } from './client';
@@ -285,25 +286,26 @@ export async function assertBookingAvailability(appointmentDate: string, appoint
   await expireStaleBookings();
   const duration = requestedDuration || (await getService(requestedService, true))?.durationMinutes || 90;
   const schedule = await getBusinessSchedule();
-  if (appointmentDate < todayInSaoPaulo() || isPastScheduleTime(appointmentDate, appointmentTime)) throw new Error('Este horário já passou. Escolha um horário futuro.');
-  if (!isBusinessDay(schedule, appointmentDate)) throw new Error('A agenda não funciona neste dia da semana.');
-  if (!buildScheduleTimes(schedule, appointmentDate, duration).includes(appointmentTime)) throw new Error('Este horário está fora do expediente ou não respeita o intervalo configurado.');
+  if (appointmentDate > maximumBookingDate()) throw new BookingAvailabilityError('Escolha uma data dentro dos próximos 24 meses.', 400);
+  if (appointmentDate < todayInSaoPaulo() || isPastScheduleTime(appointmentDate, appointmentTime)) throw new BookingAvailabilityError('Este horário já passou. Escolha um horário futuro.', 400);
+  if (!isBusinessDay(schedule, appointmentDate)) throw new BookingAvailabilityError('A agenda não funciona neste dia da semana.', 400);
+  if (!buildScheduleTimes(schedule, appointmentDate, duration).includes(appointmentTime)) throw new BookingAvailabilityError('Este horário está fora do expediente ou não respeita o intervalo configurado.', 400);
   const sql = database();
   const rows = await sql`SELECT appointment_time, service, duration_minutes FROM bookings WHERE appointment_date = ${appointmentDate} AND status NOT IN ('cancelado', 'expirado') AND (${excludeId} = '' OR id != ${excludeId})`;
   const blocks = await sql`SELECT start_time, end_time FROM schedule_blocks WHERE block_date = ${appointmentDate}`;
-  if (blocks.some((block) => !block.start_time || !block.end_time)) throw new Error('Esta data está bloqueada na agenda.');
+  if (blocks.some((block) => !block.start_time || !block.end_time)) throw new BookingAvailabilityError('Esta data está bloqueada na agenda.', 409);
   if (isBridalService(requestedService) && rows.length > 0) {
-    throw new Error('Esta data não está disponível para o Dia da Noiva, pois a experiência é exclusiva.');
+    throw new BookingAvailabilityError('Esta data não está disponível para o Dia da Noiva, pois a experiência é exclusiva.', 409);
   }
   if (rows.some((row) => isBridalService(String(row.service)))) {
-    throw new Error('Esta data está reservada com exclusividade para uma noiva.');
+    throw new BookingAvailabilityError('Esta data está reservada com exclusividade para uma noiva.', 409);
   }
   const start = timeToMinutes(appointmentTime);
   const end = start + duration;
   if (rows.some((row) => rangesOverlap(start, end, timeToMinutes(String(row.appointment_time)), timeToMinutes(String(row.appointment_time)) + Number(row.duration_minutes || 90)))) {
-    throw new Error('Este horário está indisponível. Escolha outro horário.');
+    throw new BookingAvailabilityError('Este horário está indisponível. Escolha outro horário.', 409);
   }
-  if (blocks.some((block) => rangesOverlap(start, end, timeToMinutes(String(block.start_time)), timeToMinutes(String(block.end_time))))) throw new Error('Este período está bloqueado na agenda.');
+  if (blocks.some((block) => rangesOverlap(start, end, timeToMinutes(String(block.start_time)), timeToMinutes(String(block.end_time))))) throw new BookingAvailabilityError('Este período está bloqueado na agenda.', 409);
 }
 
 export async function updatePaymentPreference(id: string, provider: string, preferenceId: string | null, paymentUrl: string | null) {

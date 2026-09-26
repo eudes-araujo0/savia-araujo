@@ -3,7 +3,7 @@ import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 5;
 const BOOKING_WINDOW_MS = 60 * 60 * 1000;
-const MAX_BOOKING_ATTEMPTS = 12;
+const MAX_BOOKING_ATTEMPTS = 6;
 let client: NeonQueryFunction<false, false> | null = null;
 let initialized: Promise<void> | null = null;
 
@@ -82,28 +82,37 @@ export async function clearFailedLogins(keyHash: string) {
   await database()`DELETE FROM login_attempts WHERE key_hash = ${keyHash}`;
 }
 
-export async function checkBookingRateLimit(keyHash: string) {
+export async function consumeBookingRateLimit(keyHash: string) {
   await ensureSecuritySchema();
+  const sql = database();
   const now = Date.now();
-  const rows = await database()`SELECT attempts, window_started, blocked_until FROM booking_attempts WHERE key_hash = ${keyHash} LIMIT 1`;
+  const resetBefore = now - BOOKING_WINDOW_MS;
+  const rows = await sql`INSERT INTO booking_attempts (key_hash, attempts, window_started, blocked_until)
+    VALUES (${keyHash}, 1, ${now}, 0)
+    ON CONFLICT (key_hash) DO UPDATE SET
+      attempts = CASE
+        WHEN booking_attempts.window_started <= ${resetBefore} THEN 1
+        ELSE booking_attempts.attempts + 1
+      END,
+      window_started = CASE
+        WHEN booking_attempts.window_started <= ${resetBefore} THEN ${now}
+        ELSE booking_attempts.window_started
+      END,
+      blocked_until = CASE
+        WHEN booking_attempts.window_started <= ${resetBefore} THEN 0
+        WHEN booking_attempts.blocked_until > ${now} THEN booking_attempts.blocked_until
+        WHEN booking_attempts.attempts + 1 > ${MAX_BOOKING_ATTEMPTS} THEN booking_attempts.window_started + ${BOOKING_WINDOW_MS}
+        ELSE 0
+      END
+    RETURNING attempts, window_started, blocked_until`;
   const row = rows[0];
-  if (!row) return { allowed: true, retryAfter: 0 };
-  const blockedUntil = Number(row.blocked_until || 0);
-  if (blockedUntil > now) return { allowed: false, retryAfter: Math.ceil((blockedUntil - now) / 1000) };
-  if (Number(row.window_started) + BOOKING_WINDOW_MS <= now) return { allowed: true, retryAfter: 0 };
-  return { allowed: Number(row.attempts) < MAX_BOOKING_ATTEMPTS, retryAfter: Math.ceil((Number(row.window_started) + BOOKING_WINDOW_MS - now) / 1000) };
-}
-
-export async function recordBookingAttempt(keyHash: string) {
-  await ensureSecuritySchema();
-  const now = Date.now();
-  const rows = await database()`SELECT attempts, window_started FROM booking_attempts WHERE key_hash = ${keyHash} LIMIT 1`;
-  const row = rows[0];
-  const reset = !row || Number(row.window_started) + BOOKING_WINDOW_MS <= now;
-  const attempts = reset ? 1 : Number(row.attempts) + 1;
-  const windowStarted = reset ? now : Number(row.window_started);
-  const blockedUntil = attempts >= MAX_BOOKING_ATTEMPTS ? now + BOOKING_WINDOW_MS : 0;
-  await database()`INSERT INTO booking_attempts (key_hash, attempts, window_started, blocked_until)
-    VALUES (${keyHash}, ${attempts}, ${windowStarted}, ${blockedUntil})
-    ON CONFLICT (key_hash) DO UPDATE SET attempts = EXCLUDED.attempts, window_started = EXCLUDED.window_started, blocked_until = EXCLUDED.blocked_until`;
+  const attempts = Number(row?.attempts || 1);
+  const blockedUntil = Number(row?.blocked_until || 0);
+  const allowed = attempts <= MAX_BOOKING_ATTEMPTS && blockedUntil <= now;
+  return {
+    allowed,
+    limit: MAX_BOOKING_ATTEMPTS,
+    remaining: Math.max(0, MAX_BOOKING_ATTEMPTS - attempts),
+    retryAfter: allowed ? 0 : Math.max(1, Math.ceil((blockedUntil - now) / 1000)),
+  };
 }

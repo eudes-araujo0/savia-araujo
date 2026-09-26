@@ -4,7 +4,7 @@ import { createPaymentCheckout } from '../../../../lib/payments';
 import { notifyBooking } from '../../../../lib/notifications';
 import { isSameOriginRequest } from '../../../../lib/request-security';
 import { runtimeValue } from '../../../../lib/runtime-env';
-import { isValidIsoDate, todayInSaoPaulo } from '../../../../lib/business-hours';
+import { isBookingId, validatePublicBookingDateTime } from '../../../../lib/booking-validation';
 
 type ManageBody = { id?: string; token?: string; action?: 'cancel' | 'reschedule' | 'retry-payment'; date?: string; time?: string };
 
@@ -15,7 +15,7 @@ export async function POST(request: Request) {
   if (Object.keys(body).some((key) => !['id', 'token', 'action', 'date', 'time'].includes(key))) return NextResponse.json({ error: 'Campos não permitidos.' }, { status: 400 });
   const id = body.id?.trim() || '';
   const token = body.token?.trim() || '';
-  if (!/^SAV-\d{8}-[A-Z0-9]{6}$/.test(id) || !body.action) return NextResponse.json({ error: 'Reserva inválida.' }, { status: 400 });
+  if (!isBookingId(id) || !body.action) return NextResponse.json({ error: 'Reserva inválida.' }, { status: 400 });
   const booking = await getManagedBooking(id, token);
   if (!booking) return NextResponse.json({ error: 'Link inválido ou expirado.' }, { status: 401 });
 
@@ -30,7 +30,8 @@ export async function POST(request: Request) {
     if (body.action === 'reschedule') {
       const date = body.date?.trim() || '';
       const time = body.time?.trim() || '';
-      if (!isValidIsoDate(date) || date < todayInSaoPaulo() || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return NextResponse.json({ error: 'Data ou horário inválido.' }, { status: 400 });
+      const dateTime = validatePublicBookingDateTime(date, time);
+      if (!dateTime.ok) return NextResponse.json({ error: dateTime.message }, { status: 400 });
       if (booking.status === 'cancelado') return NextResponse.json({ error: 'Uma reserva cancelada não pode ser reagendada por este link.' }, { status: 409 });
       if (booking.status === 'expirado') return NextResponse.json({ error: 'A pré-reserva expirou. Primeiro verifique o horário e gere um novo pagamento.' }, { status: 409 });
       if (hoursUntil(booking.appointmentDate, booking.appointmentTime) < 48) return NextResponse.json({ error: 'Para alterações com menos de 48 horas, fale diretamente com Sávia pelo WhatsApp.' }, { status: 409 });

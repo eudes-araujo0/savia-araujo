@@ -10,6 +10,7 @@ import { getAdminSession } from '../../../../lib/admin-auth';
 import { isSameOriginRequest } from '../../../../lib/request-security';
 import { BOOKABLE_SERVICE_CODES } from '../../../../lib/service-catalog';
 import { notifyBooking } from '../../../../lib/notifications';
+import { createBookingId, isBookingId, validatePublicBookingDateTime } from '../../../../lib/booking-validation';
 
 export async function GET() {
   if ((await getAdminSession())?.role !== 'master') return NextResponse.json({ error: 'Não autorizado.' }, { status: 401 });
@@ -46,12 +47,13 @@ export async function POST(request: Request) {
       if (!catalog) throw new Error('Este serviço está indisponível.');
       const date = validDate(body.date);
       const time = validBookingTime(body.time);
+      assertBookableDateTime(date, time);
       await assertBookingAvailability(date, time, service, '', catalog.durationMinutes);
       const paymentOption = body.paymentOption === 'full' ? 'full' : 'deposit';
       const paymentAmountCents = paymentOption === 'full' ? catalog.priceCents : Math.round(catalog.priceCents * .5);
       const paid = body.paid === true;
       const now = Date.now();
-      const id = `SAV-${date.replaceAll('-', '')}-${crypto.randomUUID().slice(0, 6).toUpperCase()}`;
+      const id = createBookingId();
       const booking: Booking = {
         id, createdAt: now, clientName: validText(body.clientName, 2, 120, 'Informe o nome da cliente.'), whatsapp: validPhone(body.whatsapp), email: optionalEmail(body.email),
         service, serviceLabel: catalog.name, appointmentDate: date, appointmentTime: time, durationMinutes: catalog.durationMinutes,
@@ -79,7 +81,10 @@ export async function PATCH(request: Request) {
     const id = validBookingId(body.id);
     if (body.action === 'update-booking') {
       assertKeys(body, ['action', 'id', 'clientName', 'whatsapp', 'email', 'service', 'date', 'time', 'notes']);
-      await updateBookingDetails(id, { clientName: validText(body.clientName, 2, 120, 'Informe o nome.'), whatsapp: validPhone(body.whatsapp), email: optionalEmail(body.email), service: validServiceCode(body.service), appointmentDate: validDate(body.date), appointmentTime: validBookingTime(body.time), notes: optionalText(body.notes, 1200) });
+      const date = validDate(body.date);
+      const time = validBookingTime(body.time);
+      assertBookableDateTime(date, time);
+      await updateBookingDetails(id, { clientName: validText(body.clientName, 2, 120, 'Informe o nome.'), whatsapp: validPhone(body.whatsapp), email: optionalEmail(body.email), service: validServiceCode(body.service), appointmentDate: date, appointmentTime: time, notes: optionalText(body.notes, 1200) });
       return NextResponse.json({ ok: true });
     }
     if (body.action === 'receive-balance') {
@@ -121,11 +126,15 @@ function validText(value: unknown, min: number, max: number, message: string) { 
 function optionalText(value: unknown, max: number) { const text = typeof value === 'string' ? value.trim() : ''; if (text.length > max) throw new Error('Texto acima do limite permitido.'); return text || null; }
 function validDate(value: unknown) { const date = typeof value === 'string' ? value : ''; if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || Number.isNaN(Date.parse(`${date}T12:00:00Z`))) throw new Error('Data inválida.'); return date; }
 function validTime(value: unknown) { const time = typeof value === 'string' ? value : ''; if (!/^\d{2}:\d{2}$/.test(time)) throw new Error('Horário inválido.'); return time; }
-function validBookingTime(value: unknown) { return validTime(value)!; }
+function validBookingTime(value: unknown) {
+  const time = validTime(value)!;
+  return time;
+}
+function assertBookableDateTime(date: string, time: string) { const result = validatePublicBookingDateTime(date, time); if (!result.ok) throw new Error(result.message); }
 function validServiceCode(value: unknown) { const service = typeof value === 'string' ? value : ''; if (!BOOKABLE_SERVICE_CODES.has(service)) throw new Error('Serviço inválido.'); return service; }
 function validMoney(value: unknown) { const amount = Number(value); if (!Number.isInteger(amount) || amount <= 0 || amount > 100000000) throw new Error('Valor inválido.'); return amount; }
 function validPhone(value: unknown) { const phone = validText(value, 10, 30, 'Informe um WhatsApp válido.'); const digits = phone.replace(/\D/g, ''); if (digits.length < 10 || digits.length > 13) throw new Error('Informe um WhatsApp válido.'); return phone; }
 function optionalEmail(value: unknown) { const email = typeof value === 'string' ? value.trim() : ''; if (email && (email.length > 160 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) throw new Error('E-mail inválido.'); return email || null; }
-function validBookingId(value: unknown) { const id = typeof value === 'string' ? value : ''; if (!/^SAV-\d{8}-[A-Z0-9]{6}$/.test(id)) throw new Error('Reserva inválida.'); return id; }
+function validBookingId(value: unknown) { const id = typeof value === 'string' ? value : ''; if (!isBookingId(id)) throw new Error('Reserva inválida.'); return id; }
 function timeToMinutes(value: string) { const [hour, minute] = value.split(':').map(Number); return hour * 60 + minute; }
 function assertKeys(body: Record<string, unknown>, allowed: string[]) { if (Object.keys(body).some((key) => !allowed.includes(key))) throw new Error('A solicitação contém campos não permitidos.'); }

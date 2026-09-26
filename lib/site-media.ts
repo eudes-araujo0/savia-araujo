@@ -97,6 +97,13 @@ export function managedMediaStyle(value: SiteMediaValue): CSSProperties {
   } as CSSProperties;
 }
 
+export function managedArtDirectionStyle(desktop: SiteMediaValue, mobile: SiteMediaValue): CSSProperties {
+  return {
+    '--media-desktop-x': `${desktop.desktopX}%`, '--media-desktop-y': `${desktop.desktopY}%`, '--media-desktop-zoom': desktop.desktopZoom,
+    '--media-mobile-x': `${mobile.mobileX}%`, '--media-mobile-y': `${mobile.mobileY}%`, '--media-mobile-zoom': mobile.mobileZoom,
+  } as CSSProperties;
+}
+
 function slot(
   id: string,
   section: string,

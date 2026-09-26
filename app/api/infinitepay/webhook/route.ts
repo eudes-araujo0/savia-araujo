@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getBooking, updatePaymentResult } from '../../../../db/bookings';
 import { assertInfinitePayPayment, checkInfinitePayPayment } from '../../../../lib/infinitepay';
 import { notifyBooking } from '../../../../lib/notifications';
+import { isBookingId } from '../../../../lib/booking-validation';
 
 type WebhookBody = {
   invoice_slug?: string;
@@ -20,7 +21,7 @@ export async function POST(request: Request) {
     const orderNsu = clean(body?.order_nsu, 80);
     const transactionNsu = clean(body?.transaction_nsu, 120);
     const slug = clean(body?.invoice_slug, 160);
-    if (!bookingId(orderNsu) || !transactionNsu || !slug) {
+    if (!isBookingId(orderNsu) || !transactionNsu || !slug) {
       return NextResponse.json({ success: false, message: 'Identificação inválida.' }, { status: 400 });
     }
 
@@ -53,7 +54,6 @@ export async function POST(request: Request) {
 function clean(value: unknown, max: number) {
   return typeof value === 'string' && value.length <= max ? value.trim() : '';
 }
-function bookingId(value: string) { return /^SAV-\d{8}-[A-Z0-9]{6}$/.test(value); }
 function safeReceiptUrl(value: unknown) {
   if (typeof value !== 'string' || value.length > 1000) return null;
   try { const url = new URL(value); return url.protocol === 'https:' ? url.toString() : null; } catch { return null; }

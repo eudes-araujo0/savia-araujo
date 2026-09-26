@@ -38,6 +38,7 @@ button { color: inherit; }
 .hero { position: relative; min-height: 100svh; overflow: hidden; display: flex; align-items: center; padding: 135px 6vw 105px; }
 .hero-media, .hero-shade { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hero-media { display: flex; justify-content: flex-end; overflow: hidden; background: #7b5146; }
+.hero-media .art-directed-picture { position: absolute; inset: 0; width: 100%; height: 100%; }
 .hero-image { width: 100%; height: 100%; object-fit: cover; object-position: 58% 35%; transform-origin: center; }
 .hero-image-mobile { display: none; }
 .hero-shade { background: linear-gradient(90deg, rgba(13,10,8,.88) 0%, rgba(23,15,12,.72) 36%, rgba(44,24,18,.12) 74%), linear-gradient(0deg, rgba(15,10,8,.54), transparent 48%); }
@@ -79,6 +80,11 @@ button { color: inherit; }
 .portfolio-card.tall { grid-column: span 3; grid-row: span 2; }
 .portfolio-card:nth-child(4) { grid-column: span 4; }
 .portfolio-card img, .portfolio-card video { width: 100%; height: 100%; object-fit: cover; filter: saturate(.86) contrast(1.03); transition: transform .8s cubic-bezier(.2,.7,.2,1), filter .6s ease; }
+.portfolio-card .art-directed-picture { position: absolute; inset: 0; width: 100%; height: 100%; }
+.portfolio-card .art-directed-picture img, .portfolio-card .lazy-portfolio-video { position: absolute; inset: 0; }
+.portfolio-video-poster { z-index: 0; }
+.lazy-portfolio-video { z-index: 1; opacity: 0; transition: opacity .35s ease, transform .8s cubic-bezier(.2,.7,.2,1), filter .6s ease; }
+.lazy-portfolio-video.ready { opacity: 1; }
 .portfolio-image-mobile { display: none; }
 .portfolio-card.focus-portrait img, .portfolio-card.focus-makeup img { object-position: center 12%; }
 .portfolio-card:hover img, .portfolio-card:hover video { transform: scale(1.045); filter: saturate(1); }
