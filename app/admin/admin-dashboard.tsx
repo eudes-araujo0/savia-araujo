@@ -20,7 +20,7 @@ import ScheduleManager from './schedule-manager';
 type View = 'visao-geral' | 'agenda' | 'horarios' | 'clientes' | 'clientes-pendentes' | 'financeiro' | 'comprovantes' | 'servicos' | 'imagens' | 'conta';
 type AdminModal = '' | 'booking' | 'block' | 'expense' | 'edit';
 
-type Props = { initialBookings: Booking[]; initialExpenses: Expense[]; initialBlocks: ScheduleBlock[]; initialMedia: SiteMediaValue[]; initialServices: BookableService[]; initialSchedule: BusinessSchedule; username: string; signOutPath: string };
+type Props = { initialBookings: Booking[]; initialExpenses: Expense[]; initialBlocks: ScheduleBlock[]; initialMedia: SiteMediaValue[]; initialServices: BookableService[]; initialSchedule: BusinessSchedule; username: string };
 
 const navigation: { id: View; label: string; icon: typeof LayoutDashboard }[] = [
   { id: 'visao-geral', label: 'Visão geral', icon: LayoutDashboard },
@@ -35,7 +35,7 @@ const navigation: { id: View; label: string; icon: typeof LayoutDashboard }[] = 
   { id: 'conta', label: 'Acesso e segurança', icon: Settings },
 ];
 
-export default function AdminDashboard({ initialBookings, initialExpenses, initialBlocks, initialMedia, initialServices, initialSchedule, username, signOutPath }: Props) {
+export default function AdminDashboard({ initialBookings, initialExpenses, initialBlocks, initialMedia, initialServices, initialSchedule, username }: Props) {
   const getMedia = useSiteMedia(initialMedia);
   const [bookings, setBookings] = useState(initialBookings);
   const [view, setView] = useState<View>('visao-geral');
@@ -52,7 +52,21 @@ export default function AdminDashboard({ initialBookings, initialExpenses, initi
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
   const [modal, setModal] = useState<AdminModal>('');
   const [operationBusy, setOperationBusy] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
   const today = useMemo(() => todayInSaoPaulo(), []);
+
+  async function signOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      const response = await fetch('/api/admin/session', { method: 'DELETE' });
+      if (!response.ok) throw new Error('Não foi possível encerrar a sessão.');
+      window.location.replace('/admin/login');
+    } catch (error) {
+      setFeedback({ kind: 'error', message: error instanceof Error ? error.message : 'Não foi possível encerrar a sessão.' });
+      setSigningOut(false);
+    }
+  }
 
   const refreshBookings = useCallback(async (successMessage = '') => {
     setRefreshing(true);
@@ -234,7 +248,7 @@ export default function AdminDashboard({ initialBookings, initialExpenses, initi
             })}
           </nav>
           <div className="admin-owner-card"><Image className="managed-media" src={getMedia('admin.profile').url} alt={getMedia('admin.profile').alt} fill sizes="240px" style={managedMediaStyle(getMedia('admin.profile'))} /><div><strong>Sávia Araújo</strong><small>Makeup Artist</small></div></div>
-          <div className="admin-user"><strong>{accountUsername}</strong><small>Acesso master</small><button type="button" onClick={() => openView('conta')}>Alterar acesso</button><a href={signOutPath}>Sair do painel</a></div>
+          <div className="admin-user"><strong>{accountUsername}</strong><small>Acesso master</small><button type="button" onClick={() => openView('conta')}>Alterar acesso</button><button type="button" onClick={() => void signOut()} disabled={signingOut}>{signingOut ? 'Saindo…' : 'Sair do painel'}</button></div>
         </div>
       </aside>
       {mobileMenuOpen && <button className="admin-menu-overlay" type="button" aria-label="Fechar menu" onClick={() => setMobileMenuOpen(false)} />}

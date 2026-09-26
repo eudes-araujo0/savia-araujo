@@ -1,20 +1,23 @@
 import { NextResponse } from 'next/server';
-import { ADMIN_COOKIE, ADMIN_SESSION_SECONDS, createAdminToken, loginRateLimitKey, verifyAdminCredentials } from '../../../../lib/admin-auth';
+import { ADMIN_COOKIE, ADMIN_SESSION_SECONDS, createAdminToken, getAdminSession, loginRateLimitKey, verifyAdminCredentials } from '../../../../lib/admin-auth';
 import { checkLoginRateLimit, clearFailedLogins, recordFailedLogin } from '../../../../db/security';
 import { isSameOriginRequest } from '../../../../lib/request-security';
+import { loginBodyMayExceedLimit, parseLoginPayload } from '../../../../lib/login-validation';
 
 export async function POST(request: Request) {
   if (!isSameOriginRequest(request)) return NextResponse.json({ error: 'Origem não autorizada.' }, { status: 403 });
   if (!request.headers.get('content-type')?.toLowerCase().includes('application/json')) {
     return NextResponse.json({ error: 'Formato de solicitação inválido.' }, { status: 415 });
   }
-  const body = await request.json().catch(() => ({})) as { username?: string; password?: string };
-  if (Object.keys(body).some((key) => !['username', 'password'].includes(key))) {
-    return NextResponse.json({ error: 'A solicitação contém campos não permitidos.' }, { status: 400 });
+  if (loginBodyMayExceedLimit(request.headers.get('content-length'))) {
+    return NextResponse.json({ error: 'Solicitação muito grande.' }, { status: 413, headers: { 'cache-control': 'no-store' } });
   }
-  const username = body.username?.trim() || '';
-  const password = body.password || '';
-  if (!username || username.length > 80 || password.length < 8 || password.length > 256) {
+  const payload = parseLoginPayload(await request.text());
+  if (!payload.ok) {
+    return NextResponse.json({ error: payload.error }, { status: payload.status, headers: { 'cache-control': 'no-store' } });
+  }
+  const { username, password } = payload;
+  if (!username || password.length < 8) {
     return NextResponse.json({ error: 'Usuário ou senha incorretos.' }, { status: 401 });
   }
 
@@ -44,8 +47,13 @@ export async function POST(request: Request) {
   return response;
 }
 
-export async function GET(request: Request) {
-  const response = NextResponse.redirect(new URL('/admin/login', request.url));
+export async function GET() {
+  return NextResponse.json({ authenticated: Boolean(await getAdminSession()) }, { headers: { 'cache-control': 'no-store' } });
+}
+
+export async function DELETE(request: Request) {
+  if (!isSameOriginRequest(request)) return NextResponse.json({ error: 'Origem não autorizada.' }, { status: 403 });
+  const response = NextResponse.json({ ok: true }, { headers: { 'cache-control': 'no-store' } });
   response.cookies.set(ADMIN_COOKIE, '', { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'strict', path: '/', maxAge: 0, priority: 'high' });
   return response;
 }

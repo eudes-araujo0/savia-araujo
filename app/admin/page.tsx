@@ -33,7 +33,6 @@ export default async function AdminPage() {
       initialServices={initialServices}
       initialSchedule={initialSchedule}
       username={session.username}
-      signOutPath="/api/admin/session"
     />
   );
 }
