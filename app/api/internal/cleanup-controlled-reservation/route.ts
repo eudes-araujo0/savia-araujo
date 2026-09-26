@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { database } from '../../../../../db/client';
+import { database } from '../../../../db/client';
 
 const TARGET_ID = 'SAV-20990102-D0E079';
 const TOKEN_HASH = '7ea3b985d632be1028a4bf202f7849aaf19a748e3e634d9328581258e70e7a40';
