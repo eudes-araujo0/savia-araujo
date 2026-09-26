@@ -11,7 +11,8 @@ export function isSameOriginRequest(request: Request) {
 export async function requestFingerprint(request: Request, purpose: string) {
   const forwarded = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || '';
   const address = forwarded || request.headers.get('x-real-ip') || 'unknown';
-  const agent = request.headers.get('user-agent')?.slice(0, 240) || 'unknown';
-  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${purpose}:${address}:${agent}`));
+  // Public booking limits must not be bypassable by changing User-Agent.
+  // The address is immediately hashed and never stored in plaintext.
+  const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${purpose}:${address}`));
   return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
